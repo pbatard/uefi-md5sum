@@ -1,0 +1,32 @@
+name: Windows (MSVC with gnu-efi)
+
+on:
+  workflow_dispatch:
+    branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        arch: [x64, ia32, aa64, arm]
+
+    steps:
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Build bootloaders
+      run: |
+        msbuild uefi-md5sum.sln /m /p:Configuration=Debug,Platform=${{ matrix.arch }}
+        msbuild uefi-md5sum.sln /m /p:Configuration=Release,Platform=${{ matrix.arch }}

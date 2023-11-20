@@ -1,0 +1,42 @@
+name: CodeQL code analysis
+
+on:
+  workflow_dispatch:
+    branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  SOLUTION_FILE_PATH: ./uefi-md5sum.sln
+  BUILD_CONFIGURATION: Debug
+  TARGET_PLATFORM: x64
+
+jobs:
+  CodeQL-Build:
+    runs-on: windows-latest
+
+    permissions:
+      security-events: write
+
+    steps:
+    - name: Check out repository and submodules
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: cpp
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Build UEFI bootloader
+      run: msbuild ${{ env.SOLUTION_FILE_PATH }} /m /p:Configuration=${{ env.BUILD_CONFIGURATION }},Platform=${{ env.TARGET_PLATFORM }}
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
