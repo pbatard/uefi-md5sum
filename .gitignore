@@ -69,3 +69,9 @@ image
 
 # UEFI firmware images
 *.fd
+
+# Various ignorable files
+*.old
+*.new
+*.nope
+*.patch
