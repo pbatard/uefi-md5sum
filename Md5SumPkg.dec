@@ -1,0 +1,16 @@
+## @file
+#  MD5Sum Package
+#
+#  Copyright (c) 2023, Pete Batard <pete@akeo.ie>
+#
+##
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = Md5SumPkg
+  PACKAGE_UNI_FILE               = Md5SumPkg.uni
+  PACKAGE_GUID                   = B5FFEC2E-91BD-4DFB-B703-265DEEB856D8
+  PACKAGE_VERSION                = 1.0
+
+[UserExtensions.TianoCore."ExtraFiles"]
+  Md5SumPkg-extra.uni

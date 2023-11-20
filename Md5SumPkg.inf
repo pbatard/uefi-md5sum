@@ -1,0 +1,56 @@
+## @file
+#  Component Description File for MD5Sum.
+#
+#  This bootloader performs MD5 sum validation from md5sum.txt,
+#  and then hands over to the orginial bootloader (boot###.org)
+#
+#  Copyright (c) 2023, Pete Batard <pete@akeo.ie>
+#
+#  SPDX-License-Identifier: GPL-2.0-or-later
+#
+##
+
+[Defines]
+  INF_VERSION                = 0x00010005
+  BASE_NAME                  = Md5Sum
+  FILE_GUID                  = 99A43E96-48DE-4B82-B726-83D6FB9A5AD9
+  MODULE_TYPE                = UEFI_APPLICATION
+  VERSION_STRING             = 1.0
+  ENTRY_POINT                = efi_main
+
+[Sources]
+  boot.c
+  system.c
+
+[Packages]
+  Md5SumPkg.dec
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  BaseMemoryLib
+  BaseLib
+  DebugLib
+  MemoryAllocationLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiLib
+  UefiRuntimeServicesTableLib
+  PcdLib
+
+[Guids]
+  gEfiFileSystemInfoGuid
+  gEfiSmbiosTableGuid
+  gEfiSmbios3TableGuid
+
+[Protocols]
+  gEfiLoadedImageProtocolGuid 
+  gEfiSimpleFileSystemProtocolGuid
+  gEfiUnicodeCollationProtocolGuid
+  gEfiUnicodeCollation2ProtocolGuid
+
+[Pcd]
+  gEfiMdePkgTokenSpaceGuid.PcdUefiVariableDefaultLang
+  gEfiMdePkgTokenSpaceGuid.PcdUefiVariableDefaultPlatformLang
+
+[BuildOptions]
+  RELEASE_*_*_CC_FLAGS    = -Os -DMDEPKG_NDEBUG -DNDEBUG

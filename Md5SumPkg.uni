@@ -1,0 +1,11 @@
+// /** @file
+// Module implementation for the MD5Sum Bootloader
+//
+// Copyright (c) 2023, Pete Batard <pete@akeo.ie>
+//
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// **/
+
+#string STR_PACKAGE_ABSTRACT            #language en-US "Module implementation for the MD5Sum Bootloader"
+#string STR_PACKAGE_DESCRIPTION         #language en-US "This Package contains module implementation for the MD5Sum Bootloader."
