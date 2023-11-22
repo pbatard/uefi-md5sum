@@ -75,3 +75,4 @@ image
 *.new
 *.nope
 *.patch
+version.h

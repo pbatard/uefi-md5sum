@@ -18,8 +18,8 @@ for t in $TEST_DIR/*.txt; do
   nb_lines=$(wc -l < "$t")
 
   # Run pre test script if required
-  if [[ -x "$TEST_DIR/$test_number before.sh" ]]; then
-    . "$TEST_DIR/$test_number before.sh"
+  if [[ -x "$TEST_DIR/$test_number setup.sh" ]]; then
+    . "$TEST_DIR/$test_number setup.sh"
   fi
 
   echo -n "Test #$test_number: ${test_name}... "
@@ -47,8 +47,8 @@ for t in $TEST_DIR/*.txt; do
   fi
 
   # Run post test script if required
-  if [[ -x "$TEST_DIR/$test_number after.sh" ]]; then
-    . "$TEST_DIR/$test_number after.sh"
+  if [[ -x "$TEST_DIR/$test_number teardown.sh" ]]; then
+    . "$TEST_DIR/$test_number teardown.sh"
   fi
 
 done

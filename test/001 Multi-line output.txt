@@ -1,2 +1,0 @@
-[INFO] UEFI MD5Sum
-[INFO] Copyright ? 2023 Pete Batard

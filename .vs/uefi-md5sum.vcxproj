@@ -402,6 +402,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\boot.h" />
+    <ClInclude Include="..\version.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

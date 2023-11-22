@@ -64,6 +64,14 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
 /* SMBIOS vendor name used by GitHub Actions' qemu when running the tests */
 #define TESTING_SMBIOS_NAME "GitHub Actions Test"
 
+/* Maximum size to be used for paths */
+#ifndef PATH_MAX
+#define PATH_MAX            512
+#endif
+
+/* For safety, we set a maximum size that strings shall not outgrow */
+#define STRING_MAX          (PATH_MAX + 2)
+
 /* Macro used to compute the size of an array */
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(Array)   (sizeof(Array) / sizeof((Array)[0]))
@@ -76,6 +84,9 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
 
 /* FreePool() replacement, that NULLs the freed pointer. */
 #define SafeFree(p)          do { FreePool(p); p = NULL;} while(0)
+
+/* Maximum line size for our banner */
+#define BANNER_LINE_SIZE     79
 
 /*
  * Console colours we will be using
@@ -123,6 +134,20 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
 #define COMPARE_GUID CompareGuid
 #endif
 
+/*
+ * Secure string length, that asserts if the string is NULL or if
+ * the length is larger than a predetermined value (STRING_MAX)
+ */
+STATIC __inline UINTN _SafeStrLen(CONST CHAR16 * String, CONST CHAR8 * File, CONST UINTN Line) {
+	UINTN Len = 0;
+	P_ASSERT(File, Line, String != NULL);
+	Len = StrLen(String);
+	P_ASSERT(File, Line, Len < STRING_MAX);
+	return Len;
+}
+
+#define SafeStrLen(s) _SafeStrLen(s, __FILE__, __LINE__)
+
 /**
   Detect if we are running a test system by querying the SMBIOS vendor string.
 
@@ -130,3 +155,21 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
   @retval FALSE  A regular plaform is being used.
 **/
 extern BOOLEAN IsTestSystem(VOID);
+
+/**
+  Query SMBIOS to display some info about the system hardware and UEFI firmware.
+
+  @retval EFI_SUCCESS    The system info was retrieved and displayed.
+  @retval EFI_NOT_FOUND  The system info table could not be located in the system configuration.
+  @retval EFI_ABORTED    The system info table is larger than the maximum size we accept.
+ */
+extern EFI_STATUS PrintSystemInfo(VOID);
+
+/**
+  Query the Secure Boot related firmware variables.
+
+  @retval >0 if Secure Boot is enabled
+  @retval  0 if Secure Boot is disabled
+  @retval <0 if the system is in Setup Mode
+**/
+extern INTN GetSecureBootStatus(VOID);
