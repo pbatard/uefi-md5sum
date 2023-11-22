@@ -97,10 +97,9 @@ jobs:
         mkdir -p image/efi/boot
         cp boot${{ matrix.TARGET_TYPE }}.efi image/efi/boot
 
-    - name: Run qemu
+    - name: Run tests
       # Qemu doesn't support -smbios for RISCV64, so we don't run the tests there
       if: matrix.TARGET_TYPE != 'riscv64'
-      timeout-minutes: 2
       run: |
          export QEMU_CMD="qemu-system-${{ matrix.QEMU_ARCH }} ${{ matrix.QEMU_OPTS }} -smbios type=0,vendor=\"GitHub Actions Test\",version=\"v1.0\" -L . -drive if=pflash,format=raw,unit=0,file=${{ matrix.FW_BASE }}.fd,readonly=on -drive format=raw,file=fat:rw:image -nodefaults -nographic -serial stdio -net none"
-         eval ${QEMU_CMD} | tail -n 2 | head -n -1
+         ./run_tests.sh

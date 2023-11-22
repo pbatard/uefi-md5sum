@@ -49,7 +49,8 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 
 	IsTestMode = IsTestSystem();
 
-	PrintInfo(L"UEFI MD5Sum\n");
+	PrintInfo(L"UEFI MD5Sum");
+	PrintInfo(L"Copyright © 2023 Pete Batard");
 
 	// If running in test mode, close QEMU by invoking shutdown
 	if (IsTestMode)
