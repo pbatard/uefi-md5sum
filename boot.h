@@ -84,6 +84,9 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
 /* Maximum size allowed for hash file we process */
 #define HASH_FILE_SIZE_MAX  (64 * 1024 * 1024)
 
+/* Maximum number of lines allowed in a hash file */
+#define HASH_FILE_LINES_MAX 100000
+
 /* Maximum size for the File Info structure we query */
 #define FILE_INFO_SIZE      (SIZE_OF_EFI_FILE_INFO + PATH_MAX * sizeof(CHAR16))
 
@@ -149,6 +152,31 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
 #define COMPARE_GUID CompareGuid
 #endif
 
+/* Hash entry, comprised of the (hexascii) hash value and the path it applies to */
+typedef struct {
+	CHAR8*      Hash;
+	CHAR8*      Path;
+} HASH_ENTRY;
+
+/* Hash list of <Size> Hash entries */
+typedef struct {
+	HASH_ENTRY* Entry;
+	UINTN       Size;
+	CHAR8*      Buffer;
+} HASH_LIST;
+
+/* Check for a valid lowercase hex ASCII value */
+static __inline BOOLEAN IsValidHexAscii(CHAR8 c)
+{
+	return ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+}
+
+/* Check for a valid whitespace character */
+static __inline BOOLEAN IsWhiteSpace(CHAR8 c)
+{
+	return (c == ' ' || c == '\t');
+}
+
 /*
  * Secure string length, that asserts if the string is NULL or if
  * the length is larger than a predetermined value (STRING_MAX)
@@ -194,6 +222,7 @@ extern INTN GetSecureBootStatus(VOID);
 
   @param[in]  Root   A file handle to the root directory.
   @param[in]  Path   A pointer to the CHAR16 string.
+  @param[out] List   A pointer to the HASH_LIST structure to populate.
 
   @retval EFI_SUCCESS           The file was successfully parsed and the hash list is populated.
   @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid.
@@ -202,4 +231,4 @@ extern INTN GetSecureBootStatus(VOID);
   @retval EFI_END_OF_FILE       The hash list file could not be read.
   @retval EFI_ABORTED           The hash list file contains invalid data.
 **/
-extern EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path);
+extern EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List);

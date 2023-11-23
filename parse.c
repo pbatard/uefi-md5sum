@@ -23,6 +23,7 @@
 
   @param[in]  Root   A file handle to the root directory.
   @param[in]  Path   A pointer to the CHAR16 string.
+  @param[out] List   A pointer to the HASH_LIST structure to populate.
 
   @retval EFI_SUCCESS           The file was successfully parsed and the hash list is populated.
   @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid.
@@ -31,15 +32,16 @@
   @retval EFI_END_OF_FILE       The hash list file could not be read.
   @retval EFI_ABORTED           The hash list file contains invalid data.
 **/
-EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path)
+EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List)
 {
 	EFI_STATUS Status;
 	EFI_FILE_HANDLE File;
 	EFI_FILE_INFO* Info = NULL;
 	CHAR8* HashFile = NULL;
-	UINTN i, Size, HashFileSize, NumLines;
+	HASH_ENTRY* HashList = NULL;
+	UINTN i, c, Size, HashFileSize, NumLines, HashListSize;
 
-	if (Root == NULL || Path == NULL)
+	if (Root == NULL || Path == NULL || List == NULL)
 		return EFI_INVALID_PARAMETER;
 
 	// Look for the hash file on the boot partition
@@ -94,23 +96,125 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path)
 	// Compute the maximum number of lines/entries we need to allocate
 	NumLines = 1;	// We added a line break
 	for (i = 0; i < HashFileSize - 1; i++) {
-		if (HashFile[i] == 0x0A)
+		if (HashFile[i] == 0x0A) {
 			NumLines++;
-		if (HashFile[i] == 0x0D) {
+		} else if (HashFile[i] == 0x0D) {
 			// Convert to UNIX style
 			HashFile[i] = 0x0A;
 			// Don't double count lines with DOS style ending
 			if (HashFile[i + 1] != 0x0A)
 				NumLines++;
+		} else if (HashFile[i] < ' ' && HashFile[i] != '\t') {
+			// Do not allow any NUL or control characters besides TAB
+			Status = EFI_ABORTED;
+			PrintError(L"'%s' contains invalid data", HASH_FILE);
+			goto out;
 		}
 	}
 
-	Print(L"Read %d line(s)\n", NumLines);
+	// Don't allow files with more than a specific set of entries
+	if (NumLines > HASH_FILE_LINES_MAX) {
+		Status = EFI_UNSUPPORTED;
+		PrintError(L"'%s' contains too many lines", HASH_FILE);
+		goto out;
+	}
+
+	// Allocate a array of hash entries
+	HashList = AllocateZeroPool(NumLines * sizeof(HASH_ENTRY));
+	if (HashList == NULL) {
+		Status = EFI_OUT_OF_RESOURCES;
+		PrintError(L"Unable to allocate memory");
+		goto out;
+	}
+
+	// Now parse the file to populate the array
+	HashListSize = 0;
+	for (i = 0; i < HashFileSize; ) {
+		// Ignore whitespaces, control characters or anything non-ASCII
+		// (such as BOMs) that may precede a hash entry or a comment.
+		while ((HashFile[i] <= 0x20 || HashFile[i] >= 0x80) && i < HashFileSize)
+			i++;
+		if (i >= HashFileSize)
+			break;
+
+		// Ignore comments
+		if (HashFile[i] == '#') {
+			// Note that because we added a terminating 0x0A to the file,
+			// we cannot overflow on the while loop below.
+			while (HashFile[i++] != 0x0A);
+			continue;
+		}
+
+		// Check for a valid hash, which should be HASH_HEXASCII_SIZE
+		// hexascii followed by whitespace.
+		if (i + HASH_HEXASCII_SIZE >= HashFileSize ||
+			(!IsWhiteSpace(HashFile[i + HASH_HEXASCII_SIZE]))) {
+			HashFile[MIN(HashFileSize - 1, i + HASH_HEXASCII_SIZE)] = 0x00;
+			Status = EFI_ABORTED;
+			PrintError(L"Invalid hash data after '%a'", &HashFile[i]);
+			goto out;
+		}
+
+		// NUL-terminate the hash value, add it to our array and validate it
+		HashFile[i + HASH_HEXASCII_SIZE] = 0x00;
+		HashList[HashListSize].Hash = &HashFile[i];
+		for (; HashFile[i] != 0x00; i++) {
+			// Convert A-F to lowercase
+			if (HashFile[i] >= 'A' && HashFile[i] <= 'F')
+				HashFile[i] += 0x20;
+			if (!IsValidHexAscii(HashFile[i])) {
+				Status = EFI_ABORTED;
+				PrintError(L"Invalid hash data in '%a'", HashList[HashListSize].Hash);
+				goto out;
+			}
+		}
+
+		// Skip data between hash and path
+		while (++i < HashFileSize && HashFile[i] < 0x21) {
+			// Anything other than whitespace is illegal
+			if (!IsWhiteSpace(HashFile[i])) {
+				Status = EFI_ABORTED;
+				PrintError(L"Invalid hash data after '%a'", HashList[HashListSize].Hash);
+				goto out;
+			}
+		}
+
+		// Start of path value
+		c = i;
+		while (i < HashFileSize && HashFile[i] != 0x0A) {
+			if (HashFile[i] == '/') {
+				// Convert slashes to backslashes
+				HashFile[i] = '\\';
+			} else if (HashFile[i] < ' ') {
+				// Anything lower than space (including TAB) is illegal
+				i = c;
+				break;
+			}
+			i++;
+		}
+		// Check for a path parsing error above or an illegal path length
+		if (i == c || i > c + PATH_MAX) {
+			Status = EFI_ABORTED;
+			PrintError(L"Invalid path after '%a'", HashList[HashListSize].Hash);
+			goto out;
+		}
+		// NUL-terminate the path.
+		// Note that we can't overflow here since we added an extra 0x0A to our file.
+		HashFile[i++] = 0x00;
+		HashList[HashListSize].Path = &HashFile[c];
+		HashListSize++;
+	}
+
+	List->Size = HashListSize;
+	List->Buffer = HashFile;
+	List->Entry = HashList;
 
 out:
 	SafeFree(Info);
-	if (EFI_ERROR(Status))
+	if (EFI_ERROR(Status)) {
 		SafeFree(HashFile);
+		SafeFree(HashList);
+	}
 
 	return Status;
 }

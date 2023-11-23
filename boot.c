@@ -103,6 +103,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
 	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
 	EFI_FILE_HANDLE Root;
+	HASH_LIST HashList = { 0 };
 	INTN SecureBootStatus;
 #if defined(EFI_DEBUG)
 	UINTN Event;
@@ -154,7 +155,11 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		goto out;
 	}
 
-	Status = Parse(Root, HASH_FILE);
+	Status = Parse(Root, HASH_FILE, &HashList);
+	if (EFI_ERROR(Status))
+		goto out;
+
+	Print(L"Found %d entries\n", HashList.Size);
 
 out:
 	// If running in test mode, close QEMU by invoking shutdown

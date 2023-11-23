@@ -71,7 +71,7 @@ jobs:
         echo '#define VERSION_STRING L"${{steps.set_version.outputs.version}}"' > version.h
 
     - name: Set up Linux environment
-      run: sudo apt install -y ${{ matrix.TARGET_PKGS }}
+      run: sudo apt-get update && sudo apt-get -y --no-install-recommends install ${{ matrix.TARGET_PKGS }}
 
     - name: Set up EDK2
       run: |
