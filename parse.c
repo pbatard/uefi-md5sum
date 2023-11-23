@@ -18,6 +18,9 @@
 
 #include "boot.h"
 
+ /* The hash sum list file may provide a comment with the total size of bytes to process */
+STATIC CONST CHAR8 TotalBytesString[] = "TotalBytes:";
+
 /**
   Parse a hash sum list file and populate a HASH_LIST structure from it.
 
@@ -39,7 +42,8 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 	EFI_FILE_INFO* Info = NULL;
 	CHAR8* HashFile = NULL;
 	HASH_ENTRY* HashList = NULL;
-	UINTN i, c, Size, HashFileSize, NumLines, HashListSize;
+	UINTN i, c, Size, HashFileSize, NumLines, HashListSize, NumDigits;
+	UINT64 TotalBytes = 0;
 
 	if (Root == NULL || Path == NULL || List == NULL)
 		return EFI_INVALID_PARAMETER;
@@ -137,11 +141,52 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 		if (i >= HashFileSize)
 			break;
 
-		// Ignore comments
+		// Parse comments
 		if (HashFile[i] == '#') {
+			// Look for a "# TotalBytes: 0x0123456789abcdef" comment
+
+			// Set c to the start of the comment (skipping the '#' prefix)
+			c = i + 1;
+
 			// Note that because we added a terminating 0x0A to the file,
 			// we cannot overflow on the while loop below.
 			while (HashFile[i++] != 0x0A);
+			// i - 1, used below, is the position of the terminating 0x0A
+
+			// Skip any leading spaces
+			while (c < i - 1 && IsWhiteSpace(HashFile[c]))
+				c++;
+
+			// See if we have a match for "TotalBytes:"
+			if (i > c + sizeof(TotalBytesString) - 1 && (CompareMem(&HashFile[c],
+				TotalBytesString, sizeof(TotalBytesString) - 1) == 0)) {
+				// Look for an '0x' prefix and parse the 64-bit hexascii value
+				// if valid.
+				c += sizeof(TotalBytesString) - 1;
+				while (c < i - 1 && IsWhiteSpace(HashFile[c]))
+					c++;
+				NumDigits = 0;
+				if (c < i - 2 && HashFile[c] == '0' && HashFile[c + 1] == 'x') {
+					c += 2;
+					for (; c < i - 1; c++) {
+						if (HashFile[c] == ' ')
+							continue;
+						if (!IsValidHexAscii(HashFile[c])) {
+							NumDigits = 0;
+							break;
+						}
+						NumDigits++;
+						TotalBytes <<= 4;
+						TotalBytes |= ((HashFile[c] - '0') < 0xa) ?
+							(HashFile[c] - '0') : (HashFile[c] - 'a' + 0xa);
+					}
+				}
+				if (NumDigits == 0 || NumDigits > 16) {
+					PrintWarning(L"Ignoring invalid TotalBytes value");
+					TotalBytes = 0;
+					break;
+				}
+			}
 			continue;
 		}
 
@@ -151,7 +196,7 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 			(!IsWhiteSpace(HashFile[i + HASH_HEXASCII_SIZE]))) {
 			HashFile[MIN(HashFileSize - 1, i + HASH_HEXASCII_SIZE)] = 0x00;
 			Status = EFI_ABORTED;
-			PrintError(L"Invalid hash data after '%a'", &HashFile[i]);
+			PrintError(L"Invalid data after '%a'", &HashFile[i]);
 			goto out;
 		}
 
@@ -164,7 +209,7 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 				HashFile[i] += 0x20;
 			if (!IsValidHexAscii(HashFile[i])) {
 				Status = EFI_ABORTED;
-				PrintError(L"Invalid hash data in '%a'", HashList[HashListSize].Hash);
+				PrintError(L"Invalid data in '%a'", HashList[HashListSize].Hash);
 				goto out;
 			}
 		}
@@ -174,7 +219,7 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 			// Anything other than whitespace is illegal
 			if (!IsWhiteSpace(HashFile[i])) {
 				Status = EFI_ABORTED;
-				PrintError(L"Invalid hash data after '%a'", HashList[HashListSize].Hash);
+				PrintError(L"Invalid data after '%a'", HashList[HashListSize].Hash);
 				goto out;
 			}
 		}
@@ -195,7 +240,7 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 		// Check for a path parsing error above or an illegal path length
 		if (i == c || i > c + PATH_MAX) {
 			Status = EFI_ABORTED;
-			PrintError(L"Invalid path after '%a'", HashList[HashListSize].Hash);
+			PrintError(L"Invalid data after '%a'", HashList[HashListSize].Hash);
 			goto out;
 		}
 		// NUL-terminate the path.
@@ -208,6 +253,7 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 	List->Size = HashListSize;
 	List->Buffer = HashFile;
 	List->Entry = HashList;
+	List->TotalBytes = TotalBytes;
 
 out:
 	SafeFree(Info);

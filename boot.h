@@ -163,6 +163,7 @@ typedef struct {
 	HASH_ENTRY* Entry;
 	UINTN       Size;
 	CHAR8*      Buffer;
+	UINT64      TotalBytes;
 } HASH_LIST;
 
 /* Check for a valid lowercase hex ASCII value */

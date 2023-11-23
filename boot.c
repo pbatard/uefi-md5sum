@@ -159,7 +159,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 	if (EFI_ERROR(Status))
 		goto out;
 
-	Print(L"Found %d entries\n", HashList.Size);
+	Print(L"Found %d entries (Total Bytes = 0x%lX)\n", HashList.Size, HashList.TotalBytes);
 
 out:
 	// If running in test mode, close QEMU by invoking shutdown
