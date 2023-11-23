@@ -1,4 +1,14 @@
 #!/bin/env bash
+
+## @file
+#  Test script for MD5Sum.
+#
+#  Copyright (c) 2023, Pete Batard <pete@akeo.ie>
+#
+#  SPDX-License-Identifier: GPL-2.0-or-later
+#
+##
+
 TEST_DIR=./test
 TIMEOUT=2m
 NUM_PASS=0

@@ -20,6 +20,7 @@
 
 [Sources]
   boot.c
+  parse.c
   system.c
 
 [Packages]
@@ -38,6 +39,7 @@
   PcdLib
 
 [Guids]
+  gEfiFileInfoGuid
   gEfiFileSystemInfoGuid
   gEfiSmbiosTableGuid
   gEfiSmbios3TableGuid

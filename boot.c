@@ -100,6 +100,9 @@ STATIC VOID DisplayBanner(VOID)
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
 	EFI_STATUS Status = EFI_SUCCESS;
+	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
+	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
+	EFI_FILE_HANDLE Root;
 	INTN SecureBootStatus;
 #if defined(EFI_DEBUG)
 	UINTN Event;
@@ -130,6 +133,30 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		DefText();
 	}
 
+	Status = gBS->OpenProtocol(MainImageHandle, &gEfiLoadedImageProtocolGuid,
+		(VOID**)&LoadedImage, MainImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (EFI_ERROR(Status)) {
+		PrintError(L"Unable to access boot image interface");
+		goto out;
+	}
+
+	// Open the the root directory on the boot volume
+	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle, &gEfiSimpleFileSystemProtocolGuid,
+		(VOID**)&Volume, MainImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+	if (EFI_ERROR(Status)) {
+		PrintError(L"Unable to open boot volume");
+		goto out;
+	}
+	Root = NULL;
+	Status = Volume->OpenVolume(Volume, &Root);
+	if (EFI_ERROR(Status)) {
+		PrintError(L"Unable to open root directory");
+		goto out;
+	}
+
+	Status = Parse(Root, HASH_FILE);
+
+out:
 	// If running in test mode, close QEMU by invoking shutdown
 	if (IsTestMode)
 		SHUTDOWN;

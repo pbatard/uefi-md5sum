@@ -395,6 +395,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\boot.c" />
+    <ClCompile Include="..\parse.c" />
     <ClCompile Include="..\system.c" />
   </ItemGroup>
   <ItemGroup>

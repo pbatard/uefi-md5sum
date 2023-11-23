@@ -64,6 +64,15 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
 /* SMBIOS vendor name used by GitHub Actions' qemu when running the tests */
 #define TESTING_SMBIOS_NAME "GitHub Actions Test"
 
+/* Name of the file containing the list of hashes */
+#define HASH_FILE           L"md5sum.txt"
+
+/* Size of an MD5 hash */
+#define MD5_HASHSIZE        16
+
+/* Size of the hexascii representation of a hash */
+#define HASH_HEXASCII_SIZE  (MD5_HASHSIZE * 2)
+
 /* Maximum size to be used for paths */
 #ifndef PATH_MAX
 #define PATH_MAX            512
@@ -71,6 +80,12 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
 
 /* For safety, we set a maximum size that strings shall not outgrow */
 #define STRING_MAX          (PATH_MAX + 2)
+
+/* Maximum size allowed for hash file we process */
+#define HASH_FILE_SIZE_MAX  (64 * 1024 * 1024)
+
+/* Maximum size for the File Info structure we query */
+#define FILE_INFO_SIZE      (SIZE_OF_EFI_FILE_INFO + PATH_MAX * sizeof(CHAR16))
 
 /* Macro used to compute the size of an array */
 #ifndef ARRAY_SIZE
@@ -173,3 +188,18 @@ extern EFI_STATUS PrintSystemInfo(VOID);
   @retval <0 if the system is in Setup Mode
 **/
 extern INTN GetSecureBootStatus(VOID);
+
+/**
+  Parse a hash sum list file and populate a HASH_LIST structure from it.
+
+  @param[in]  Root   A file handle to the root directory.
+  @param[in]  Path   A pointer to the CHAR16 string.
+
+  @retval EFI_SUCCESS           The file was successfully parsed and the hash list is populated.
+  @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid.
+  @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
+  @retval EFI_UNSUPPORTED       The hash list file is too small or too large.
+  @retval EFI_END_OF_FILE       The hash list file could not be read.
+  @retval EFI_ABORTED           The hash list file contains invalid data.
+**/
+extern EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path);
