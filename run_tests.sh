@@ -23,11 +23,9 @@ if [[ -z "$QEMU_CMD" ]]; then
   exit 1
 fi
 
-rm -f image/md5sum.txt
+for t in $TEST_DIR/*.dat; do
 
-for t in $TEST_DIR/*.txt; do
-
-  base=$(basename "${t%.txt}")
+  base=$(basename "${t%.dat}")
   test_number=${base:0:3}
   test_name=${base:4}
   test_desc="Test #$test_number: ${test_name}... "

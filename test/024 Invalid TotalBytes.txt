@@ -1,2 +1,0 @@
-[WARN] Ignoring invalid TotalBytes value
-Found 1 entries (Total Bytes = 0x0)

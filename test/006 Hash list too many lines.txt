@@ -1,1 +1,0 @@
-[FAIL] 'md5sum.txt' contains too many lines: [3] Unsupported

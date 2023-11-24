@@ -71,7 +71,9 @@ jobs:
         echo '#define VERSION_STRING L"${{steps.set_version.outputs.version}}"' > version.h
 
     - name: Set up Linux environment
-      run: sudo apt-get update && sudo apt-get -y --no-install-recommends install ${{ matrix.TARGET_PKGS }}
+      run: |
+        sudo apt-get update
+        sudo apt-get -y --no-install-recommends install ${{ matrix.TARGET_PKGS }}
 
     - name: Set up EDK2
       run: |
@@ -113,4 +115,5 @@ jobs:
       if: matrix.TARGET_TYPE != 'riscv64'
       run: |
          export QEMU_CMD="qemu-system-${{ matrix.QEMU_ARCH }} ${{ matrix.QEMU_OPTS }} -smbios type=0,vendor=\"GitHub Actions Test\",version=\"v1.0\" -L . -drive if=pflash,format=raw,unit=0,file=${{ matrix.FW_BASE }}.fd,readonly=on -drive format=raw,file=fat:rw:image -nodefaults -nographic -serial stdio -net none"
+         ./gen_tests.sh
          ./run_tests.sh

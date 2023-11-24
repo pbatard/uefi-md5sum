@@ -1,1 +1,0 @@
-[FAIL] 'md5sum.txt' is too small: [3] Unsupported
