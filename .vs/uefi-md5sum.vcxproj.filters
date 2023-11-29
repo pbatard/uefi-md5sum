@@ -27,6 +27,9 @@
     <ClCompile Include="..\parse.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\hash.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\boot.h">

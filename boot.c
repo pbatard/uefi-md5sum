@@ -100,11 +100,12 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
 	EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *SimpleTextOut;
 	EFI_FILE_HANDLE Root;
+	EFI_INPUT_KEY Key;
 	HASH_LIST HashList = { 0 };
-	CHAR16 *PluralFiles;
-#if defined(EFI_DEBUG)
-	UINTN Index;
-#endif
+	CHAR8 c;
+	CHAR16 Path[PATH_MAX], NumFailedString[32] = { 0 }, *PluralFiles;
+	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
+	UINTN i, Index, NumFailed;
 
 #if defined(_GNU_EFI)
 	InitializeLib(BaseImageHandle, SystemTable);
@@ -157,11 +158,54 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 	}
 
 	PluralFiles = (HashList.Size == 1) ? L"" : L"s";
+	NumFailed = 0;
+	gST->ConIn->Reset(gST->ConIn, FALSE);
+	for (Index = 0; Index < HashList.Size; Index++) {
+		// Check for user cancellation
+		if (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) != EFI_NOT_READY)
+			break;
+
+		// Report progress
+		if (!IsTestMode) {
+			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
+			Print(L"%d/%d file%s processed%s\n", Index,
+				HashList.Size, PluralFiles, NumFailedString);
+		}
+
+		// Convert the expected hexascii hash to a binary value we can use
+		ZeroMem(ExpectedHash, sizeof(ExpectedHash));
+		for (i = 0; i < MD5_HASHSIZE * 2; i++) {
+			c = HashList.Entry[Index].Hash[i];
+			V_ASSERT(IsValidHexAscii(c));
+			ExpectedHash[i / 2] <<= 4;
+			ExpectedHash[i / 2] |= c >= 'a' ? (c - 'a' + 0x0A) : c - '0';
+		}
+		// Use a poor man's UCS-2 to ASCII conversion for now:
+		for (i = 0; i <= AsciiStrLen(HashList.Entry[Index].Path); i++)
+			Path[i] = (CHAR16)HashList.Entry[Index].Path[i];
+		// TODO: We will need to handle progress & cancellation in HashFile()
+		Status = HashFile(Root, Path, ComputedHash);
+		if (Status == EFI_SUCCESS &&
+			(CompareMem(ComputedHash, ExpectedHash, MD5_HASHSIZE) != 0))
+			Status = EFI_CRC_ERROR;
+		if (EFI_ERROR(Status)) {
+			// Truncate the path in case it's very long
+			// TODO: Ideally we'd want long path reduction like Windows does
+			if (AsciiStrLen(HashList.Entry[Index].Path) > 80)
+				HashList.Entry[Index].Path[80] = 0;
+			PrintError(L"File '%a'", HashList.Entry[Index].Path);
+			NumFailed++;
+			UnicodeSPrint(NumFailedString, ARRAY_SIZE(NumFailedString),
+				L" [%d failed]", NumFailed);
+		}
+	}
+
 	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
-	Print(L"0/%d file%s processed\n", HashList.Size, PluralFiles);
+	Print(L"%d/%d file%s processed%s\n", Index,
+		HashList.Size, PluralFiles, NumFailedString);
 
 out:
-	// If running in test mode, close QEMU by invoking ShutDown()
+	// If running in test mode, shut down QEMU
 	if (IsTestMode)
 		ShutDown();
 

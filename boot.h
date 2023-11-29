@@ -70,6 +70,12 @@ extern BOOLEAN              IsTestMode;
 /* Size of an MD5 hash */
 #define MD5_HASHSIZE        16
 
+/* Block size used for MD5 hash computation */
+#define MD5_BLOCKSIZE       64
+
+/* Buffer size used for MD5 hashing */
+#define MD5_BUFFERSIZE      4096
+
 /* Size of the hexascii representation of a hash */
 #define HASH_HEXASCII_SIZE  (MD5_HASHSIZE * 2)
 
@@ -89,6 +95,13 @@ extern BOOLEAN              IsTestMode;
 
 /* Maximum size for the File Info structure we query */
 #define FILE_INFO_SIZE      (SIZE_OF_EFI_FILE_INFO + PATH_MAX * sizeof(CHAR16))
+
+/* Data alignment macros */
+#if defined(__GNUC__)
+#define ALIGNED(m)          __attribute__ ((__aligned__(m)))
+#elif defined(_MSC_VER)
+#define ALIGNED(m)          __declspec(align(m))
+#endif
 
 /* Macro used to compute the size of an array */
 #ifndef ARRAY_SIZE
@@ -154,6 +167,13 @@ extern BOOLEAN              IsTestMode;
 #else
 #define COMPARE_GUID CompareGuid
 #endif
+
+/* Context that is used to hash data */
+typedef struct ALIGNED(64) {
+	UINT8       Buffer[MD5_BLOCKSIZE];
+	UINT32      State[4];
+	UINT64      ByteCount;
+} HASH_CONTEXT;
 
 /* Hash entry, comprised of the (hexascii) hash value and the path it applies to */
 typedef struct {
@@ -255,3 +275,18 @@ extern INTN GetSecureBootStatus(VOID);
   @retval EFI_ABORTED           The hash list file contains invalid data.
 **/
 extern EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List);
+
+/**
+  Compute the MD5 hash of a single file.
+
+  @param[in]     Root   A file handle to the root directory.
+  @param[in]     Path   A pointer to the CHAR16 string with the target path.
+  @param[in/out] Hash   A pointer to the 16-byte array that is to receive the hash.
+
+  @retval EFI_SUCCESS           The file was successfully processed and the hash has been populated.
+  @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid or one of the paths
+								from the hash list points to a directory.
+  @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
+  @retval EFI_NOT_FOUND         The target file could not be found on the media.
+**/
+extern EFI_STATUS HashFile(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, UINT8* Hash);
