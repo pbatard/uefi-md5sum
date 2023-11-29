@@ -28,10 +28,6 @@
  */
 BOOLEAN IsTestMode = FALSE;
 
-/* Copies of the global image handle and system table for the current executable */
-EFI_SYSTEM_TABLE*   MainSystemTable = NULL;
-EFI_HANDLE          MainImageHandle = NULL;
-
 /* Strings used to identify the plaform */
 #if defined(_M_X64) || defined(__x86_64__)
   STATIC CHAR16* Arch = L"x64";
@@ -99,18 +95,16 @@ STATIC VOID DisplayBanner(VOID)
  */
 EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
-	EFI_STATUS Status = EFI_SUCCESS;
+	EFI_STATUS Status;
 	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
 	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
+	EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *SimpleTextOut;
 	EFI_FILE_HANDLE Root;
 	HASH_LIST HashList = { 0 };
-	INTN SecureBootStatus;
+	CHAR16 *PluralFiles;
 #if defined(EFI_DEBUG)
-	UINTN Event;
+	UINTN Index;
 #endif
-
-	MainSystemTable = SystemTable;
-	MainImageHandle = BaseImageHandle;
 
 #if defined(_GNU_EFI)
 	InitializeLib(BaseImageHandle, SystemTable);
@@ -118,24 +112,17 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 
 	IsTestMode = IsTestSystem();
 
-	// Display non-critical system information
-	DisplayBanner();
-	PrintSystemInfo();
-	SecureBootStatus = GetSecureBootStatus();
-	SetText(TEXT_WHITE);
-	Print(L"[INFO]");
-	DefText();
-	Print(L" Secure Boot status: ");
-	if (SecureBootStatus == 0) {
-		Print(L"Disabled\n");
-	} else {
-		SetText((SecureBootStatus > 0) ? TEXT_WHITE : TEXT_YELLOW);
-		Print(L"%s\n", (SecureBootStatus > 0) ? L"Enabled" : L"Setup");
-		DefText();
+	if (!IsTestMode)
+		DisplayBanner();
+
+	Status = gBS->LocateProtocol(&gEfiSimpleTextOutProtocolGuid, NULL, (VOID**)&SimpleTextOut);
+	if (EFI_ERROR(Status)) {
+		PrintError(L"Unable to initialize text output");
+		goto out;
 	}
 
-	Status = gBS->OpenProtocol(MainImageHandle, &gEfiLoadedImageProtocolGuid,
-		(VOID**)&LoadedImage, MainImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	Status = gBS->OpenProtocol(BaseImageHandle, &gEfiLoadedImageProtocolGuid,
+		(VOID**)&LoadedImage, BaseImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(Status)) {
 		PrintError(L"Unable to access boot image interface");
 		goto out;
@@ -143,7 +130,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 
 	// Open the the root directory on the boot volume
 	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle, &gEfiSimpleFileSystemProtocolGuid,
-		(VOID**)&Volume, MainImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+		(VOID**)&Volume, BaseImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
 	if (EFI_ERROR(Status)) {
 		PrintError(L"Unable to open boot volume");
 		goto out;
@@ -155,25 +142,37 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		goto out;
 	}
 
+	// Parse the md5sum.txt to construct a hash list
 	Status = Parse(Root, HASH_FILE, &HashList);
 	if (EFI_ERROR(Status))
 		goto out;
 
-	Print(L"Found %d entries (Total Bytes = 0x%lX)\n", HashList.Size, HashList.TotalBytes);
+	if (IsTestMode) {
+		// Print any extra data we want to validate in test mode
+		Print(L"[TEST] TotalBytes = 0x%lX\n", HashList.TotalBytes);
+	} else {
+		// Position our output near the center of the screen
+		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y);
+		Print(L"Media verification - Press any key to cancel\n");
+	}
+
+	PluralFiles = (HashList.Size == 1) ? L"" : L"s";
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
+	Print(L"0/%d file%s processed\n", HashList.Size, PluralFiles);
 
 out:
-	// If running in test mode, close QEMU by invoking shutdown
+	// If running in test mode, close QEMU by invoking ShutDown()
 	if (IsTestMode)
-		SHUTDOWN;
+		ShutDown();
 
 #if defined(EFI_DEBUG)
-	// If running debug, wait for a user keystroke and shutdown
+	// If running debug, wait for a user keystroke and shut down
 	SetText(TEXT_YELLOW);
 	Print(L"\nPress any key to exit.\n");
 	DefText();
 	gST->ConIn->Reset(gST->ConIn, FALSE);
-	gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Event);
-	SHUTDOWN;
+	gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
+	ShutDown();
 #endif
 
 	return Status;

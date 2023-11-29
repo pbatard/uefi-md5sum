@@ -18,7 +18,7 @@
 
 #include "boot.h"
 
- /* The hash sum list file may provide a comment with the total size of bytes to process */
+/* The hash sum list file may provide a comment with the total size of bytes to process */
 STATIC CONST CHAR8 TotalBytesString[] = "TotalBytes:";
 
 /**

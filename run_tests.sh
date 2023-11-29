@@ -75,7 +75,7 @@ for t in $TEST_DIR/*.dat; do
       NUM_FAIL=$((NUM_FAIL + 1))
       echo "Output of failed test was:"
       echo "-------------------------------------------------------------------------------"
-      tail -n +4 output.txt
+      tail -n +3 output.txt
       echo "-------------------------------------------------------------------------------"
     fi
   fi

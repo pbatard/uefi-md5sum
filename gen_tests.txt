@@ -13,7 +13,7 @@
 
 # Hash list min size
 > echo -n "00112233445566778899aabbccddeeff ." > image/md5sum.txt
-Found 1 entries (Total Bytes = 0x0)
+0/1 file processed
 
 # Hash list too large
 > dd if=/dev/zero of=image/md5sum.txt bs=1M count=65
@@ -49,7 +49,7 @@ Found 1 entries (Total Bytes = 0x0)
 
 # Hash containing uppercase
 > echo "00112233445566778899AaBbCcDdEeFf Mixed case hash"  > image/md5sum.txt
-Found 1 entries (Total Bytes = 0x0)
+0/1 file processed
 
 # Path containing NUL
 > echo "00112233445566778899aabbccddeeff This	path contains a NUL" | tr '\11' '\0'  > image/md5sum.txt
@@ -67,17 +67,17 @@ Found 1 entries (Total Bytes = 0x0)
 # Max Path size
 > echo -n "00112233445566778899aabbccddeeff " > image/md5sum.txt
 > cat /dev/zero | tr '\0' 'a' | head -c 512 - >> image/md5sum.txt
-Found 1 entries (Total Bytes = 0x0)
+0/1 file processed
 
 # Comment preceded by whitespaces
 > echo " 	# Comment preceded by whitespaces" > image/md5sum.txt
 > echo "0123456789abcdef0123456789abcdef file" >> image/md5sum.txt
-Found 1 entries (Total Bytes = 0x0)
+0/1 file processed
 
 # Comment followed by whitespaces
 > echo "# Comment followed by whitespaces 	" > image/md5sum.txt
 > echo "0123456789abcdef0123456789abcdef file1" >> image/md5sum.txt
-Found 1 entries (Total Bytes = 0x0)
+0/1 file processed
 
 # Comment containing a NUL
 > echo "00112233445566778899aabbccddeeff file1" > image/md5sum.txt
@@ -89,12 +89,12 @@ Found 1 entries (Total Bytes = 0x0)
 > echo "00112233445566778899aabbccddeeff file1" > image/md5sum.txt
 > echo "# Comment in the middle" >> image/md5sum.txt
 > echo "0123456789abcdef0123456789abcdef file2" >> image/md5sum.txt
-Found 2 entries (Total Bytes = 0x0)
+0/2 files processed
 
 # Unterminated hash list
 > echo "00112233445566778899aabbccddeeff file1" > image/md5sum.txt
 > echo -n "0123456789abcdef0123456789abcdef file2" >> image/md5sum.txt
-Found 2 entries (Total Bytes = 0x0)
+0/2 files processed
 
 # Empty path
 > echo "00112233445566778899aabbccddeeff     "  > image/md5sum.txt
@@ -105,38 +105,45 @@ Found 2 entries (Total Bytes = 0x0)
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "# TotalBytes:" >> image/md5sum.txt
 [WARN] Ignoring invalid TotalBytes value
-Found 1 entries (Total Bytes = 0x0)
+[TEST] TotalBytes = 0x0
+0/1 file processed
 
 # Invalid TotalBytes
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "# TotalBytes: invalid" >> image/md5sum.txt
 [WARN] Ignoring invalid TotalBytes value
-Found 1 entries (Total Bytes = 0x0)
+[TEST] TotalBytes = 0x0
+0/1 file processed
 
 # TotalBytes invalid 0x prefix
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "# TotalBytes: 0 x1234" >> image/md5sum.txt
 [WARN] Ignoring invalid TotalBytes value
-Found 1 entries (Total Bytes = 0x0)
+[TEST] TotalBytes = 0x0
+0/1 file processed
 
 # TotalBytes missing 0x prefix
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "# TotalBytes: 1234" >> image/md5sum.txt
 [WARN] Ignoring invalid TotalBytes value
-Found 1 entries (Total Bytes = 0x0)
+[TEST] TotalBytes = 0x0
+0/1 file processed
 
 # TotalBytes 1 character value
 > echo "# TotalBytes: 0x8  " > image/md5sum.txt
 > echo "00112233445566778899aabbccddeeff file" >> image/md5sum.txt
-Found 1 entries (Total Bytes = 0x8)
+[TEST] TotalBytes = 0x8
+0/1 file processed
 
 # TotalBytes 16 characters value
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "#TotalBytes: 0x12345678abcdef0" >> image/md5sum.txt
-Found 1 entries (Total Bytes = 0x12345678ABCDEF0)
+[TEST] TotalBytes = 0x12345678ABCDEF0
+0/1 file processed
 
 # TotalBytes 17 characters value
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "# TotalBytes:    0xabcdabcdabcdabcd0   " >> image/md5sum.txt
 [WARN] Ignoring invalid TotalBytes value
-Found 1 entries (Total Bytes = 0x0)
+[TEST] TotalBytes = 0x0
+0/1 file processed

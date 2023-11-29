@@ -57,15 +57,15 @@
 /* Set to true when we are running the GitHub Actions tests */
 extern BOOLEAN              IsTestMode;
 
-/* Copies of the global image handle and system table for the current executable */
-extern EFI_HANDLE           MainImageHandle;
-extern EFI_SYSTEM_TABLE*    MainSystemTable;
-
 /* SMBIOS vendor name used by GitHub Actions' qemu when running the tests */
 #define TESTING_SMBIOS_NAME "GitHub Actions Test"
 
 /* Name of the file containing the list of hashes */
 #define HASH_FILE           L"md5sum.txt"
+
+/* Used to center our output on screen */
+#define TEXT_POSITION_X     0
+#define TEXT_POSITION_Y     6
 
 /* Size of an MD5 hash */
 #define MD5_HASHSIZE        16
@@ -132,13 +132,16 @@ extern EFI_SYSTEM_TABLE*    MainSystemTable;
 #define PrintError(fmt, ...)    do { SetText(TEXT_RED); Print(L"[FAIL]"); DefText(); \
                                      Print(L" " fmt L": [%d] %r\n", ##__VA_ARGS__, (Status&0x7FFFFFFF), Status); } while (0)
 
+/* Convenience macro to position text on screen (when not running in test mode). */
+#define SetTextPosition(x, y)   do { if (!IsTestMode) SimpleTextOut->SetCursorPosition(SimpleTextOut, x, y);} while (0)
+
 /* Halt/Shutdown macros */
-#define SHUTDOWN            MainSystemTable->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL)
+#define SHUTDOWN            gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL)
 #define HALT                while(1)
 
 /* Convenience assertion macro */
 #define P_ASSERT(f, l, a)   do { if(!(a)) { Print(L"*** ASSERT FAILED: %a(%d): %a ***\n", f, l, #a); \
-                                          if (IsTestMode) SHUTDOWN; else HALT; } } while(0)
+                                          if (IsTestMode) ShutDown(); else Halt(); } } while(0)
 #define V_ASSERT(a)         P_ASSERT(__FILE__, __LINE__, a)
 
 /*
@@ -167,15 +170,34 @@ typedef struct {
 } HASH_LIST;
 
 /* Check for a valid lowercase hex ASCII value */
-static __inline BOOLEAN IsValidHexAscii(CHAR8 c)
+STATIC __inline BOOLEAN IsValidHexAscii(CHAR8 c)
 {
 	return ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
 }
 
 /* Check for a valid whitespace character */
-static __inline BOOLEAN IsWhiteSpace(CHAR8 c)
+STATIC __inline BOOLEAN IsWhiteSpace(CHAR8 c)
 {
 	return (c == ' ' || c == '\t');
+}
+
+/* Pause the system for a specific duration (in ms) */
+STATIC __inline EFI_STATUS Sleep(UINTN MicroSeconds)
+{
+	return gBS->Stall(MicroSeconds);
+}
+
+/* Shut down the system immediately */
+STATIC __inline VOID ShutDown()
+{
+	gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+}
+
+/* Freeze the system with current screen output, then shut it down after one hour */
+STATIC __inline VOID Halt()
+{
+	Sleep(3600 * 1000);
+	gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
 }
 
 /*
