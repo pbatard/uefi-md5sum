@@ -114,10 +114,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 	EFI_INPUT_KEY Key;
 	HASH_LIST HashList = { 0 };
 	CHAR8 c;
-	CHAR16 Path[PATH_MAX], NumFailedString[32] = { 0 }, *PluralFiles;
+	CHAR16 Path[PATH_MAX + 1], NumFailedString[32] = { 0 }, *PluralFiles;
 	CHAR16 *EmptyLine = NULL;
 	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
-	UINTN i, Index, NumFailed, Cols, Rows;
+	UINTN i, Index, Cols, Rows, NumFailed = 0;
 
 #if defined(_GNU_EFI)
 	InitializeLib(BaseImageHandle, SystemTable);
@@ -185,7 +185,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 
 	// Now go through each entry we parsed
 	PluralFiles = (HashList.Size == 1) ? L"" : L"s";
-	NumFailed = 0;
 	gST->ConIn->Reset(gST->ConIn, FALSE);
 	for (Index = 0; Index < HashList.Size; Index++) {
 		// Check for user cancellation
@@ -208,9 +207,22 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 			ExpectedHash[i / 2] |= c >= 'a' ? (c - 'a' + 0x0A) : c - '0';
 		}
 
-		// Use a poor man's UCS-2 to ASCII conversion for now:
-		for (i = 0; i <= AsciiStrLen(HashList.Entry[Index].Path); i++)
-			Path[i] = (CHAR16)HashList.Entry[Index].Path[i];
+		// Convert UTF-8 sequences to UCS-2
+		Status = Utf8ToUcs2(HashList.Entry[Index].Path, Path, ARRAY_SIZE(Path));
+		if (EFI_ERROR(Status)) {
+			// Truncate the path in case it's very long
+			if (AsciiStrLen(HashList.Entry[Index].Path) > 80)
+				HashList.Entry[Index].Path[80] = '\0';
+			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
+			if (EmptyLine != NULL && !IsTestMode)
+				Print(EmptyLine);
+			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
+			PrintError(L"File '%a'", HashList.Entry[Index].Path);
+			NumFailed++;
+			UnicodeSPrint(NumFailedString, ARRAY_SIZE(NumFailedString),
+				L" [%d failed]", NumFailed);
+			continue;
+		}
 
 		// Hash the file and compare its value to the expected one
 		// TODO: We will need to handle progress & cancellation in HashFile()
@@ -221,13 +233,13 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		if (EFI_ERROR(Status)) {
 			// Truncate the path in case it's very long
 			// TODO: Ideally we'd want long path reduction like Windows does
-			if (AsciiStrLen(HashList.Entry[Index].Path) > 80)
-				HashList.Entry[Index].Path[80] = 0;
+			if (SafeStrLen(Path) > 80)
+				Path[80] = L'\0';
 			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
 			if (EmptyLine != NULL && !IsTestMode)
 				Print(EmptyLine);
 			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
-			PrintError(L"File '%a'", HashList.Entry[Index].Path);
+			PrintError(L"File '%s'", Path);
 			NumFailed++;
 			UnicodeSPrint(NumFailedString, ARRAY_SIZE(NumFailedString),
 				L" [%d failed]", NumFailed);
@@ -247,9 +259,9 @@ out:
 
 #if defined(EFI_DEBUG)
 	// If running debug, wait for a user keystroke and shut down
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + MIN(NumFailed, FAILED_FILES_MAX));
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 5 + MIN(NumFailed, FAILED_FILES_MAX));
 	SetText(TEXT_YELLOW);
-	Print(L"\nPress any key to exit.\n");
+	Print(L"Press any key to exit.\n");
 	DefText();
 	gST->ConIn->Reset(gST->ConIn, FALSE);
 	gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);

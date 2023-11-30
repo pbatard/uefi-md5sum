@@ -23,6 +23,7 @@
   hash.c
   parse.c
   system.c
+  utf8.c
 
 [Packages]
   Md5SumPkg.dec

@@ -194,11 +194,11 @@
 [FAIL] File 'dir': [2] Invalid Parameter
 1/1 file processed [1 failed]
 
-# MD5 files in subdiretories
+# MD5 files in subdirectories (with spaces)
 > mkdir image/dir1
 > dd if=/dev/urandom of=image/dir1/file1 bs=1k count=8
-> mkdir image/dir2
-> dd if=/dev/urandom of=image/dir2/file2 bs=1k count=16
+> mkdir "image/dir 2"
+> dd if=/dev/urandom of="image/dir 2/file 2" bs=1k count=16
 > (cd image; find ./dir* -type f -exec md5sum {} \; > md5sum.txt)
 2/2 files processed
 < rm -rf image/dir*
@@ -229,3 +229,17 @@
 [FAIL] File 'file': [27] CRC Error
 1/1 file processed [1 failed]
 < rm image/file*
+
+# UTF-8 invalid sequences
+> echo -e '00112233445566778899aabbccddeeff inv\x80alid' > image/md5sum.txt
+> echo -e '00112233445566778899aabbccddeeff \xff\xff\xff\xff' >> image/md5sum.txt
+[FAIL] File 'inv?alid': [2] Invalid Parameter
+[FAIL] File '????': [2] Invalid Parameter
+2/2 files processed [2 failed]
+
+# UTF-8 complex sequences (with spaces)
+> dd if=/dev/urandom of="image/VÅ lid中國.dat" bs=1k count=8
+> dd if=/dev/urandom of="image/テ レ ビ.dat" bs=1k count=16
+> (cd image; find *.dat -type f -exec md5sum {} \; > md5sum.txt)
+2/2 files processed
+< rm -f image/*.dat

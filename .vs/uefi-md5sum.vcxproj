@@ -398,6 +398,7 @@
     <ClCompile Include="..\hash.c" />
     <ClCompile Include="..\parse.c" />
     <ClCompile Include="..\system.c" />
+    <ClCompile Include="..\utf8.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\debug.vbs" />

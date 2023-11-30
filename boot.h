@@ -90,6 +90,9 @@ extern BOOLEAN              IsTestMode;
 /* For safety, we set a maximum size that strings shall not outgrow */
 #define STRING_MAX          (PATH_MAX + 2)
 
+/* Shorthand for Unicode strings */
+typedef UINT32              CHAR32;
+
 /* Maximum size allowed for hash file we process */
 #define HASH_FILE_SIZE_MAX  (64 * 1024 * 1024)
 
@@ -200,7 +203,7 @@ STATIC __inline BOOLEAN IsWhiteSpace(CHAR8 c)
 	return (c == ' ' || c == '\t');
 }
 
-/* Pause the system for a specific duration (in ms) */
+/* Pause the system for a specific duration (in us) */
 STATIC __inline EFI_STATUS Sleep(UINTN MicroSeconds)
 {
 	return gBS->Stall(MicroSeconds);
@@ -215,7 +218,7 @@ STATIC __inline VOID ShutDown()
 /* Freeze the system with current screen output, then shut it down after one hour */
 STATIC __inline VOID Halt()
 {
-	Sleep(3600 * 1000);
+	Sleep((UINTN)3600 * 1000 * 1000);
 	gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
 }
 
@@ -271,3 +274,16 @@ extern EFI_STATUS Parse(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OU
   @retval EFI_NOT_FOUND         The target file could not be found on the media.
 **/
 extern EFI_STATUS HashFile(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT UINT8* Hash);
+
+/**
+  Convert a UTF-8 encoded string to a UCS-2 encoded string.
+
+  @param[in]  Utf8String      A pointer to the input UTF-8 encoded string.
+  @param[out] Ucs2String      A pointer to the output UCS-2 encoded string.
+  @param[in]  Ucs2StringSize  The size of the Ucs2String buffer (in CHAR16).
+
+  @retval EFI_SUCCESS            The conversion was successful.
+  @retval EFI_INVALID_PARAMETER  One or more of the input parameters are invalid.
+  @retval EFI_BUFFER_TOO_SMALL   The output buffer is too small to hold the result.
+**/
+EFI_STATUS Utf8ToUcs2(IN CONST CHAR8* Utf8String, OUT CHAR16* Ucs2String, IN CONST UINTN Ucs2StringSize);
