@@ -141,7 +141,7 @@ EFI_STATUS Utf8ToUcs2(
 	V_ASSERT(Ucs2Index < Ucs2StringSize);
 
 	// NUL-terminate the UCS-2 string
-	Ucs2String[Ucs2Index] = 0;
+	Ucs2String[Ucs2Index] = L'\0';
 
 	return EFI_SUCCESS;
 }

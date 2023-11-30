@@ -68,7 +68,7 @@ extern BOOLEAN              IsTestMode;
 #define TEXT_POSITION_Y     5
 
 /* Number of failed entries we display beneath the validation line before looping back */
-#define FAILED_FILES_MAX    5
+#define FAILED_ENTRIES_MAX  5
 
 /* Size of an MD5 hash */
 #define MD5_HASHSIZE        16

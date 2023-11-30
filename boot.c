@@ -28,6 +28,9 @@
  */
 BOOLEAN IsTestMode = FALSE;
 
+/* We'll use this string to erase a full line on the console */
+CHAR16* EmptyLine = NULL;
+
 /* Strings used to identify the plaform */
 #if defined(_M_X64) || defined(__x86_64__)
   STATIC CHAR16* Arch = L"x64";
@@ -46,10 +49,16 @@ BOOLEAN IsTestMode = FALSE;
 /**
   Display a centered application banner
  **/
-STATIC VOID DisplayBanner(UINTN Cols)
+STATIC VOID DisplayBanner(
+	IN UINTN Cols
+)
 {
 	UINTN i, Len;
 	CHAR16* Line;
+
+	// Don't display the banner in test mode
+	if (IsTestMode)
+		return;
 
 	// The platform logo may still be displayed → remove it
 	gST->ConOut->ClearScreen(gST->ConOut);
@@ -101,11 +110,72 @@ STATIC VOID DisplayBanner(UINTN Cols)
 	FreePool(Line);
 }
 
+/**
+  Print a hash entry that has failed processing.
+  Do this over a specific section of the console we cycle over.
+
+  @param[in]  Status     The Status code from the failed operation on the entry.
+  @param[in]  Path       A pointer to the CHAR16 string with the Path of the entry.
+  @param[in]  NumFailed  The current number of failed entries.
+
+**/
+STATIC VOID PrintFailedEntry(
+	IN CONST EFI_STATUS Status,
+	IN CHAR16* Path,
+	IN CONST UINTN NumFailed
+)
+{
+	// Truncate the path in case it's very long.
+	// TODO: Ideally we'd want long path reduction similar to what Windows does.
+	if (SafeStrLen(Path) > 80)
+		Path[80] = L'\0';
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 +
+		(NumFailed % FAILED_ENTRIES_MAX));
+	if (EmptyLine != NULL && !IsTestMode)
+		Print(EmptyLine);
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 +
+		(NumFailed % FAILED_ENTRIES_MAX));
+	PrintError(L"File '%s'", Path);
+}
+
+/**
+  Exit-specific processing for test/debug
+
+  @param[in]  NumFailed  The total number of failed entries.
+**/
+STATIC VOID ExitCheck(
+	IN INTN NumFailed
+)
+{
+#if defined(EFI_DEBUG)
+	UINTN Index;
+#endif
+
+	// If running in test mode, shut down QEMU
+	if (IsTestMode)
+		ShutDown();
+
+	// If running debug, wait for a user keystroke and shut down
+#if defined(EFI_DEBUG)
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 5 +
+		MIN(NumFailed, FAILED_ENTRIES_MAX));
+	SetText(TEXT_YELLOW);
+	Print(L"Press any key to exit.\n");
+	DefText();
+	gST->ConIn->Reset(gST->ConIn, FALSE);
+	gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
+	ShutDown();
+#endif
+}
+
 /*
  * Application entry-point
  * NB: This must be set to 'efi_main' for gnu-efi crt0 compatibility
  */
-EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+EFI_STATUS EFIAPI efi_main(
+	IN EFI_HANDLE BaseImageHandle,
+	IN EFI_SYSTEM_TABLE *SystemTable
+)
 {
 	EFI_STATUS Status;
 	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
@@ -115,7 +185,6 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 	HASH_LIST HashList = { 0 };
 	CHAR8 c;
 	CHAR16 Path[PATH_MAX + 1], NumFailedString[32] = { 0 }, *PluralFiles;
-	CHAR16 *EmptyLine = NULL;
 	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
 	UINTN i, Index, Cols, Rows, NumFailed = 0;
 
@@ -125,11 +194,12 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 
 	// Determine if we are running in test mode.
 	// Note that test mode is no less secure than regular mode.
-	// It only produces or removes some specific output from the screen.
+	// It only produces or removes extra onscreen output.
 	IsTestMode = IsTestSystem();
 
 	// Find the amount of console real-estate we have at out disposal
-	Status = gST->ConOut->QueryMode(gST->ConOut, gST->ConOut->Mode->Mode, &Cols, &Rows);
+	Status = gST->ConOut->QueryMode(gST->ConOut, gST->ConOut->Mode->Mode,
+		&Cols, &Rows);
 	if (EFI_ERROR(Status)) {
 		// Couldn't get the console dimensions
 		Cols = 80;
@@ -137,10 +207,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 	}
 
 	// Display the top banner
-	if (!IsTestMode)
-		DisplayBanner(Cols);
+	DisplayBanner(Cols);
 
-	// Create blank line which we'll use to erase when overwriting a line
+	// Create the blank line we'll use to erase a line
 	EmptyLine = AllocateZeroPool((Cols + 1) * sizeof(CHAR16));
 	if (EmptyLine != NULL) {
 		for (i = 0; i < Cols; i++)
@@ -149,15 +218,17 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 
 	// Access the loaded image so we can open the current volume
 	Status = gBS->OpenProtocol(BaseImageHandle, &gEfiLoadedImageProtocolGuid,
-		(VOID**)&LoadedImage, BaseImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+		(VOID**)&LoadedImage, BaseImageHandle,
+		NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(Status)) {
 		PrintError(L"Unable to access boot image interface");
 		goto out;
 	}
 
 	// Open the the root directory on the boot volume
-	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle, &gEfiSimpleFileSystemProtocolGuid,
-		(VOID**)&Volume, BaseImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle,
+		&gEfiSimpleFileSystemProtocolGuid, (VOID**)&Volume,
+		BaseImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
 	if (EFI_ERROR(Status)) {
 		PrintError(L"Unable to open boot volume");
 		goto out;
@@ -181,11 +252,12 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		// Position our output near the center of the screen
 		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y);
 		Print(L"Media verification - Press any key to cancel\n");
+		// Clear the input buffer
+		gST->ConIn->Reset(gST->ConIn, FALSE);
 	}
 
 	// Now go through each entry we parsed
 	PluralFiles = (HashList.Size == 1) ? L"" : L"s";
-	gST->ConIn->Reset(gST->ConIn, FALSE);
 	for (Index = 0; Index < HashList.Size; Index++) {
 		// Check for user cancellation
 		if (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) != EFI_NOT_READY)
@@ -202,50 +274,43 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		ZeroMem(ExpectedHash, sizeof(ExpectedHash));
 		for (i = 0; i < MD5_HASHSIZE * 2; i++) {
 			c = HashList.Entry[Index].Hash[i];
+			// The Parse() call should have filtered any invalid string
 			V_ASSERT(IsValidHexAscii(c));
 			ExpectedHash[i / 2] <<= 4;
 			ExpectedHash[i / 2] |= c >= 'a' ? (c - 'a' + 0x0A) : c - '0';
 		}
 
-		// Convert UTF-8 sequences to UCS-2
+		// Convert the UTF-8 path to UCS-2
 		Status = Utf8ToUcs2(HashList.Entry[Index].Path, Path, ARRAY_SIZE(Path));
 		if (EFI_ERROR(Status)) {
-			// Truncate the path in case it's very long
-			if (AsciiStrLen(HashList.Entry[Index].Path) > 80)
-				HashList.Entry[Index].Path[80] = '\0';
-			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
-			if (EmptyLine != NULL && !IsTestMode)
-				Print(EmptyLine);
-			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
-			PrintError(L"File '%a'", HashList.Entry[Index].Path);
-			NumFailed++;
-			UnicodeSPrint(NumFailedString, ARRAY_SIZE(NumFailedString),
-				L" [%d failed]", NumFailed);
-			continue;
+			// Conversion failed but we want a UCS-2 Path for the failure
+			// report so just filter out anything that is non lower ASCII.
+			V_ASSERT(AsciiStrLen(HashList.Entry[Index].Path) < ARRAY_SIZE(Path));
+			for (i = 0; i < AsciiStrLen(HashList.Entry[Index].Path); i++) {
+				c = HashList.Entry[Index].Path[i];
+				if (c < ' ' || c > 0x80)
+					c = '?';
+				Path[i] = (CHAR16)c;
+			}
+			Path[i] = L'\0';
+		} else {
+			// Hash the file and compare the result to the expected value
+			// TODO: We should also handle progress & cancellation in HashFile()
+			Status = HashFile(Root, Path, ComputedHash);
+			if (Status == EFI_SUCCESS &&
+				(CompareMem(ComputedHash, ExpectedHash, MD5_HASHSIZE) != 0))
+				Status = EFI_CRC_ERROR;
 		}
 
-		// Hash the file and compare its value to the expected one
-		// TODO: We will need to handle progress & cancellation in HashFile()
-		Status = HashFile(Root, Path, ComputedHash);
-		if (Status == EFI_SUCCESS &&
-			(CompareMem(ComputedHash, ExpectedHash, MD5_HASHSIZE) != 0))
-			Status = EFI_CRC_ERROR;
+		// Report failures
 		if (EFI_ERROR(Status)) {
-			// Truncate the path in case it's very long
-			// TODO: Ideally we'd want long path reduction like Windows does
-			if (SafeStrLen(Path) > 80)
-				Path[80] = L'\0';
-			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
-			if (EmptyLine != NULL && !IsTestMode)
-				Print(EmptyLine);
-			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
-			PrintError(L"File '%s'", Path);
-			NumFailed++;
+			PrintFailedEntry(Status, Path, NumFailed++);
 			UnicodeSPrint(NumFailedString, ARRAY_SIZE(NumFailedString),
 				L" [%d failed]", NumFailed);
 		}
 	}
 
+	// Final progress report
 	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2);
 	Print(L"%d/%d file%s processed%s\n", Index,
 		HashList.Size, PluralFiles, NumFailedString);
@@ -253,20 +318,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 out:
 	SafeFree(HashList.Buffer);
 	SafeFree(EmptyLine);
-	// If running in test mode, shut down QEMU
-	if (IsTestMode)
-		ShutDown();
-
-#if defined(EFI_DEBUG)
-	// If running debug, wait for a user keystroke and shut down
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 5 + MIN(NumFailed, FAILED_FILES_MAX));
-	SetText(TEXT_YELLOW);
-	Print(L"Press any key to exit.\n");
-	DefText();
-	gST->ConIn->Reset(gST->ConIn, FALSE);
-	gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
-	ShutDown();
-#endif
+	ExitCheck(NumFailed);
 
 	return Status;
 }
