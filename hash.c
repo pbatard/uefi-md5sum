@@ -261,7 +261,7 @@ STATIC VOID Md5Final(HASH_CONTEXT* Context)
 
   @param[in]     Root   A file handle to the root directory.
   @param[in]     Path   A pointer to the CHAR16 string with the target path.
-  @param[in/out] Hash   A pointer to the 16-byte array that is to receive the hash.
+  @param[out]    Hash   A pointer to the 16-byte array that is to receive the hash.
 
   @retval EFI_SUCCESS           The file was successfully processed and the hash has been populated.
   @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid or one of the paths
@@ -269,7 +269,11 @@ STATIC VOID Md5Final(HASH_CONTEXT* Context)
   @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
   @retval EFI_NOT_FOUND         The target file could not be found on the media.
 **/
-EFI_STATUS HashFile(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, UINT8* Hash)
+EFI_STATUS HashFile(
+	IN CONST EFI_FILE_HANDLE Root,
+	IN CONST CHAR16* Path,
+	OUT UINT8* Hash
+)
 {
 	EFI_STATUS Status = EFI_INVALID_PARAMETER;
 	EFI_FILE_HANDLE File = NULL;

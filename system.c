@@ -28,7 +28,10 @@
   @retval EFI_SUCCESS    The table was found and the Table pointer was set.
   @retval EFI_NOT_FOUND  The table could not be located in the system configuration.
 **/
-STATIC EFI_STATUS GetSystemConfigurationTable(EFI_GUID* TableGuid, VOID** Table)
+STATIC EFI_STATUS GetSystemConfigurationTable(
+	IN EFI_GUID* TableGuid,
+	OUT VOID** Table
+)
 {
 	UINTN Index;
 	V_ASSERT(Table != NULL);
@@ -51,7 +54,10 @@ STATIC EFI_STATUS GetSystemConfigurationTable(EFI_GUID* TableGuid, VOID** Table)
   @retval     Pointer to a string (may be NULL if the string is not populated) or a
               pointer to next SMBIOS structure if StringNumber is 0xFFFF.
 **/
-STATIC CHAR8* GetSmbiosString(SMBIOS_STRUCTURE_POINTER* Smbios, UINT16 StringNumber)
+STATIC CHAR8* GetSmbiosString(
+	IN SMBIOS_STRUCTURE_POINTER* Smbios,
+	IN UINT16 StringNumber
+)
 {
 	UINT16 Index;
 	CHAR8* String;

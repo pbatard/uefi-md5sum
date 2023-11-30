@@ -46,47 +46,59 @@ BOOLEAN IsTestMode = FALSE;
 /**
   Display a centered application banner
  **/
-STATIC VOID DisplayBanner(VOID)
+STATIC VOID DisplayBanner(UINTN Cols)
 {
 	UINTN i, Len;
-	CHAR16 String[BANNER_LINE_SIZE + 1];
+	CHAR16* Line;
 
 	// The platform logo may still be displayed → remove it
 	gST->ConOut->ClearScreen(gST->ConOut);
 
+	V_ASSERT(Cols > 79);
+	Line = AllocatePool((Cols + 1) * sizeof(CHAR16));
+	if (Line == NULL)
+		return;
+
+	Cols -= 1;
+	SetTextPosition(0, 0);
 	SetText(TEXT_REVERSED);
-	Print(L"\n%c", BOXDRAW_DOWN_RIGHT);
-	for (i = 0; i < BANNER_LINE_SIZE - 2; i++)
+	Print(L"%c", BOXDRAW_DOWN_RIGHT);
+	for (i = 0; i < Cols - 2; i++)
 		Print(L"%c", BOXDRAW_HORIZONTAL);
-	Print(L"%c\n", BOXDRAW_DOWN_LEFT);
+	Print(L"%c", BOXDRAW_DOWN_LEFT);
 
-	UnicodeSPrint(String, ARRAY_SIZE(String), L"UEFI md5sum %s (%s)", VERSION_STRING, Arch);
-	Len = SafeStrLen(String);
-	V_ASSERT(Len < BANNER_LINE_SIZE);
+	SetTextPosition(0, 1);
+	UnicodeSPrint(Line, Cols, L"UEFI md5sum %s (%s)", VERSION_STRING, Arch);
+	Len = SafeStrLen(Line);
+	V_ASSERT(Len < Cols);
 	Print(L"%c", BOXDRAW_VERTICAL);
-	for (i = 1; i < (BANNER_LINE_SIZE - Len) / 2; i++)
+	for (i = 1; i < (Cols - Len) / 2; i++)
 		Print(L" ");
-	Print(String);
-	for (i += Len; i < BANNER_LINE_SIZE - 1; i++)
+	Print(Line);
+	for (i += Len; i < Cols - 1; i++)
 		Print(L" ");
-	Print(L"%c\n", BOXDRAW_VERTICAL);
-
-	UnicodeSPrint(String, ARRAY_SIZE(String), L"<https://md5.akeo.ie>");
-	Len = SafeStrLen(String);
-	V_ASSERT(Len < BANNER_LINE_SIZE);
 	Print(L"%c", BOXDRAW_VERTICAL);
-	for (i = 1; i < (BANNER_LINE_SIZE - Len) / 2; i++)
-		Print(L" ");
-	Print(String);
-	for (i += Len; i < BANNER_LINE_SIZE - 1; i++)
-		Print(L" ");
-	Print(L"%c\n", BOXDRAW_VERTICAL);
 
+	SetTextPosition(0, 2);
+	UnicodeSPrint(Line, Cols, L"<https://md5.akeo.ie>");
+	Len = SafeStrLen(Line);
+	V_ASSERT(Len < Cols);
+	Print(L"%c", BOXDRAW_VERTICAL);
+	for (i = 1; i < (Cols - Len) / 2; i++)
+		Print(L" ");
+	Print(Line);
+	for (i += Len; i < Cols - 1; i++)
+		Print(L" ");
+	Print(L"%c", BOXDRAW_VERTICAL);
+
+	SetTextPosition(0, 3);
 	Print(L"%c", BOXDRAW_UP_RIGHT);
-	for (i = 0; i < 77; i++)
+	for (i = 0; i < Cols - 2; i++)
 		Print(L"%c", BOXDRAW_HORIZONTAL);
-	Print(L"%c\n\n", BOXDRAW_UP_LEFT);
+	Print(L"%c", BOXDRAW_UP_LEFT);
 	DefText();
+
+	FreePool(Line);
 }
 
 /*
@@ -98,30 +110,44 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 	EFI_STATUS Status;
 	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
 	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
-	EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *SimpleTextOut;
 	EFI_FILE_HANDLE Root;
 	EFI_INPUT_KEY Key;
 	HASH_LIST HashList = { 0 };
 	CHAR8 c;
 	CHAR16 Path[PATH_MAX], NumFailedString[32] = { 0 }, *PluralFiles;
+	CHAR16 *EmptyLine = NULL;
 	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
-	UINTN i, Index, NumFailed;
+	UINTN i, Index, NumFailed, Cols, Rows;
 
 #if defined(_GNU_EFI)
 	InitializeLib(BaseImageHandle, SystemTable);
 #endif
 
+	// Determine if we are running in test mode.
+	// Note that test mode is no less secure than regular mode.
+	// It only produces or removes some specific output from the screen.
 	IsTestMode = IsTestSystem();
 
-	if (!IsTestMode)
-		DisplayBanner();
-
-	Status = gBS->LocateProtocol(&gEfiSimpleTextOutProtocolGuid, NULL, (VOID**)&SimpleTextOut);
+	// Find the amount of console real-estate we have at out disposal
+	Status = gST->ConOut->QueryMode(gST->ConOut, gST->ConOut->Mode->Mode, &Cols, &Rows);
 	if (EFI_ERROR(Status)) {
-		PrintError(L"Unable to initialize text output");
-		goto out;
+		// Couldn't get the console dimensions
+		Cols = 80;
+		Rows = 40;
 	}
 
+	// Display the top banner
+	if (!IsTestMode)
+		DisplayBanner(Cols);
+
+	// Create blank line which we'll use to erase when overwriting a line
+	EmptyLine = AllocateZeroPool((Cols + 1) * sizeof(CHAR16));
+	if (EmptyLine != NULL) {
+		for (i = 0; i < Cols; i++)
+			EmptyLine[i] = L' ';
+	}
+
+	// Access the loaded image so we can open the current volume
 	Status = gBS->OpenProtocol(BaseImageHandle, &gEfiLoadedImageProtocolGuid,
 		(VOID**)&LoadedImage, BaseImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(Status)) {
@@ -143,13 +169,13 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		goto out;
 	}
 
-	// Parse the md5sum.txt to construct a hash list
+	// Parse md5sum.txt to construct a hash list
 	Status = Parse(Root, HASH_FILE, &HashList);
 	if (EFI_ERROR(Status))
 		goto out;
 
 	if (IsTestMode) {
-		// Print any extra data we want to validate in test mode
+		// Print any extra data we want to validate
 		Print(L"[TEST] TotalBytes = 0x%lX\n", HashList.TotalBytes);
 	} else {
 		// Position our output near the center of the screen
@@ -157,6 +183,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		Print(L"Media verification - Press any key to cancel\n");
 	}
 
+	// Now go through each entry we parsed
 	PluralFiles = (HashList.Size == 1) ? L"" : L"s";
 	NumFailed = 0;
 	gST->ConIn->Reset(gST->ConIn, FALSE);
@@ -167,7 +194,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 
 		// Report progress
 		if (!IsTestMode) {
-			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
+			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2);
 			Print(L"%d/%d file%s processed%s\n", Index,
 				HashList.Size, PluralFiles, NumFailedString);
 		}
@@ -180,9 +207,12 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 			ExpectedHash[i / 2] <<= 4;
 			ExpectedHash[i / 2] |= c >= 'a' ? (c - 'a' + 0x0A) : c - '0';
 		}
+
 		// Use a poor man's UCS-2 to ASCII conversion for now:
 		for (i = 0; i <= AsciiStrLen(HashList.Entry[Index].Path); i++)
 			Path[i] = (CHAR16)HashList.Entry[Index].Path[i];
+
+		// Hash the file and compare its value to the expected one
 		// TODO: We will need to handle progress & cancellation in HashFile()
 		Status = HashFile(Root, Path, ComputedHash);
 		if (Status == EFI_SUCCESS &&
@@ -193,6 +223,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 			// TODO: Ideally we'd want long path reduction like Windows does
 			if (AsciiStrLen(HashList.Entry[Index].Path) > 80)
 				HashList.Entry[Index].Path[80] = 0;
+			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
+			if (EmptyLine != NULL && !IsTestMode)
+				Print(EmptyLine);
+			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + (NumFailed % FAILED_FILES_MAX));
 			PrintError(L"File '%a'", HashList.Entry[Index].Path);
 			NumFailed++;
 			UnicodeSPrint(NumFailedString, ARRAY_SIZE(NumFailedString),
@@ -200,17 +234,20 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE BaseImageHandle, EFI_SYSTEM_TABLE *SystemT
 		}
 	}
 
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2);
 	Print(L"%d/%d file%s processed%s\n", Index,
 		HashList.Size, PluralFiles, NumFailedString);
 
 out:
+	SafeFree(HashList.Buffer);
+	SafeFree(EmptyLine);
 	// If running in test mode, shut down QEMU
 	if (IsTestMode)
 		ShutDown();
 
 #if defined(EFI_DEBUG)
 	// If running debug, wait for a user keystroke and shut down
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 + MIN(NumFailed, FAILED_FILES_MAX));
 	SetText(TEXT_YELLOW);
 	Print(L"\nPress any key to exit.\n");
 	DefText();

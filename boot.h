@@ -65,7 +65,10 @@ extern BOOLEAN              IsTestMode;
 
 /* Used to center our output on screen */
 #define TEXT_POSITION_X     0
-#define TEXT_POSITION_Y     6
+#define TEXT_POSITION_Y     5
+
+/* Number of failed entries we display beneath the validation line before looping back */
+#define FAILED_FILES_MAX    5
 
 /* Size of an MD5 hash */
 #define MD5_HASHSIZE        16
@@ -146,11 +149,7 @@ extern BOOLEAN              IsTestMode;
                                      Print(L" " fmt L": [%d] %r\n", ##__VA_ARGS__, (Status&0x7FFFFFFF), Status); } while (0)
 
 /* Convenience macro to position text on screen (when not running in test mode). */
-#define SetTextPosition(x, y)   do { if (!IsTestMode) SimpleTextOut->SetCursorPosition(SimpleTextOut, x, y);} while (0)
-
-/* Halt/Shutdown macros */
-#define SHUTDOWN            gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL)
-#define HALT                while(1)
+#define SetTextPosition(x, y)   do { if (!IsTestMode) gST->ConOut->SetCursorPosition(gST->ConOut, x, y);} while (0)
 
 /* Convenience assertion macro */
 #define P_ASSERT(f, l, a)   do { if(!(a)) { Print(L"*** ASSERT FAILED: %a(%d): %a ***\n", f, l, #a); \
@@ -185,7 +184,7 @@ typedef struct {
 typedef struct {
 	HASH_ENTRY* Entry;
 	UINTN       Size;
-	CHAR8*      Buffer;
+	UINT8*      Buffer;
 	UINT64      TotalBytes;
 } HASH_LIST;
 
@@ -243,24 +242,6 @@ STATIC __inline UINTN _SafeStrLen(CONST CHAR16 * String, CONST CHAR8 * File, CON
 extern BOOLEAN IsTestSystem(VOID);
 
 /**
-  Query SMBIOS to display some info about the system hardware and UEFI firmware.
-
-  @retval EFI_SUCCESS    The system info was retrieved and displayed.
-  @retval EFI_NOT_FOUND  The system info table could not be located in the system configuration.
-  @retval EFI_ABORTED    The system info table is larger than the maximum size we accept.
- */
-extern EFI_STATUS PrintSystemInfo(VOID);
-
-/**
-  Query the Secure Boot related firmware variables.
-
-  @retval >0 if Secure Boot is enabled
-  @retval  0 if Secure Boot is disabled
-  @retval <0 if the system is in Setup Mode
-**/
-extern INTN GetSecureBootStatus(VOID);
-
-/**
   Parse a hash sum list file and populate a HASH_LIST structure from it.
 
   @param[in]  Root   A file handle to the root directory.
@@ -274,7 +255,7 @@ extern INTN GetSecureBootStatus(VOID);
   @retval EFI_END_OF_FILE       The hash list file could not be read.
   @retval EFI_ABORTED           The hash list file contains invalid data.
 **/
-extern EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List);
+extern EFI_STATUS Parse(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT HASH_LIST* List);
 
 /**
   Compute the MD5 hash of a single file.
@@ -289,4 +270,4 @@ extern EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIS
   @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
   @retval EFI_NOT_FOUND         The target file could not be found on the media.
 **/
-extern EFI_STATUS HashFile(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, UINT8* Hash);
+extern EFI_STATUS HashFile(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT UINT8* Hash);

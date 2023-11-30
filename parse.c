@@ -35,12 +35,16 @@ STATIC CONST CHAR8 TotalBytesString[] = "TotalBytes:";
   @retval EFI_END_OF_FILE       The hash list file could not be read.
   @retval EFI_ABORTED           The hash list file contains invalid data.
 **/
-EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List)
+EFI_STATUS Parse(
+	IN CONST EFI_FILE_HANDLE Root,
+	IN CONST CHAR16* Path,
+	OUT HASH_LIST* List
+)
 {
 	EFI_STATUS Status;
 	EFI_FILE_HANDLE File;
 	EFI_FILE_INFO* Info = NULL;
-	CHAR8* HashFile = NULL;
+	UINT8* HashFile = NULL;
 	HASH_ENTRY* HashList = NULL;
 	UINTN i, c, Size, HashFileSize, NumLines, HashListSize, NumDigits;
 	UINT64 TotalBytes = 0;
@@ -95,18 +99,18 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 		goto out;
 	}
 	// Correct to the actual size of our buffer and add a newline
-	HashFile[HashFileSize++] = 0x0A;
+	HashFile[HashFileSize++] = '\n';
 
 	// Compute the maximum number of lines/entries we need to allocate
 	NumLines = 1;	// We added a line break
 	for (i = 0; i < HashFileSize - 1; i++) {
-		if (HashFile[i] == 0x0A) {
+		if (HashFile[i] == '\n') {
 			NumLines++;
-		} else if (HashFile[i] == 0x0D) {
+		} else if (HashFile[i] == '\r') {
 			// Convert to UNIX style
-			HashFile[i] = 0x0A;
+			HashFile[i] = '\n';
 			// Don't double count lines with DOS style ending
-			if (HashFile[i + 1] != 0x0A)
+			if (HashFile[i + 1] != '\n')
 				NumLines++;
 		} else if (HashFile[i] < ' ' && HashFile[i] != '\t') {
 			// Do not allow any NUL or control characters besides TAB
@@ -136,7 +140,7 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 	for (i = 0; i < HashFileSize; ) {
 		// Ignore whitespaces, control characters or anything non-ASCII
 		// (such as BOMs) that may precede a hash entry or a comment.
-		while ((HashFile[i] <= 0x20 || HashFile[i] >= 0x80) && i < HashFileSize)
+		while ((HashFile[i] <= ' ' || HashFile[i] >= 0x80) && i < HashFileSize)
 			i++;
 		if (i >= HashFileSize)
 			break;
@@ -148,10 +152,10 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 			// Set c to the start of the comment (skipping the '#' prefix)
 			c = i + 1;
 
-			// Note that because we added a terminating 0x0A to the file,
+			// Note that because we added a terminating '\n' to the file,
 			// we cannot overflow on the while loop below.
-			while (HashFile[i++] != 0x0A);
-			// i - 1, used below, is the position of the terminating 0x0A
+			while (HashFile[i++] != '\n');
+			// i - 1, used below, is the position of the terminating '\n'
 
 			// Skip any leading spaces
 			while (c < i - 1 && IsWhiteSpace(HashFile[c]))
@@ -194,16 +198,16 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 		// hexascii followed by whitespace.
 		if (i + HASH_HEXASCII_SIZE >= HashFileSize ||
 			(!IsWhiteSpace(HashFile[i + HASH_HEXASCII_SIZE]))) {
-			HashFile[MIN(HashFileSize - 1, i + HASH_HEXASCII_SIZE)] = 0x00;
+			HashFile[MIN(HashFileSize - 1, i + HASH_HEXASCII_SIZE)] = '\0';
 			Status = EFI_ABORTED;
-			PrintError(L"Invalid data after '%a'", &HashFile[i]);
+			PrintError(L"Invalid data after '%a'", (CHAR8*)&HashFile[i]);
 			goto out;
 		}
 
 		// NUL-terminate the hash value, add it to our array and validate it
-		HashFile[i + HASH_HEXASCII_SIZE] = 0x00;
-		HashList[HashListSize].Hash = &HashFile[i];
-		for (; HashFile[i] != 0x00; i++) {
+		HashFile[i + HASH_HEXASCII_SIZE] = '\0';
+		HashList[HashListSize].Hash = (CHAR8*)&HashFile[i];
+		for (; HashFile[i] != '\0'; i++) {
 			// Convert A-F to lowercase
 			if (HashFile[i] >= 'A' && HashFile[i] <= 'F')
 				HashFile[i] += 0x20;
@@ -226,7 +230,7 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 
 		// Start of path value
 		c = i;
-		while (i < HashFileSize && HashFile[i] != 0x0A) {
+		while (i < HashFileSize && HashFile[i] != '\n') {
 			if (HashFile[i] == '/') {
 				// Convert slashes to backslashes
 				HashFile[i] = '\\';
@@ -245,8 +249,8 @@ EFI_STATUS Parse(CONST EFI_FILE_HANDLE Root, CONST CHAR16* Path, HASH_LIST* List
 		}
 		// NUL-terminate the path.
 		// Note that we can't overflow here since we added an extra 0x0A to our file.
-		HashFile[i++] = 0x00;
-		HashList[HashListSize].Path = &HashFile[c];
+		HashFile[i++] = '\0';
+		HashList[HashListSize].Path = (CHAR8*)&HashFile[c];
 		HashListSize++;
 	}
 
