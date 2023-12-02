@@ -25,33 +25,18 @@ jobs:
         - TARGET_TYPE: x64
           TARGET_ARCH: X64
           TARGET_PKGS: python3-distutils nasm uuid-dev qemu-system-x86
-          QEMU_ARCH: x86_64
-          QEMU_OPTS: -M q35
-          FW_BASE: OVMF
         - TARGET_TYPE: ia32
           TARGET_ARCH: IA32
           TARGET_PKGS: gcc-multilib python3-distutils nasm uuid-dev qemu-system-x86
-          QEMU_ARCH: i386
-          QEMU_OPTS: -M pc
-          FW_BASE: OVMF
         - TARGET_TYPE: aa64
           TARGET_ARCH: AARCH64
           TARGET_PKGS: gcc-aarch64-linux-gnu python3-distutils uuid-dev qemu-system-arm
-          QEMU_ARCH: aarch64
-          QEMU_OPTS: -M virt -cpu cortex-a57
-          FW_BASE: AAVMF
         - TARGET_TYPE: arm
           TARGET_ARCH: ARM
           TARGET_PKGS: gcc-arm-linux-gnueabi python3-distutils uuid-dev qemu-system-arm
-          QEMU_ARCH: arm
-          QEMU_OPTS: -M virt -cpu cortex-a15
-          FW_BASE: AAVMF
         - TARGET_TYPE: riscv64
           TARGET_ARCH: RISCV64
           TARGET_PKGS: gcc-riscv64-linux-gnu python3-distutils uuid-dev qemu-system-misc
-          QEMU_ARCH: riscv64
-          QEMU_OPTS: -M virt -cpu sifive-u54
-          FW_BASE: QEMU_EFI
 
     steps:
     - name: Check out repository
@@ -96,24 +81,3 @@ jobs:
       with:
         name: uefi-md5sum
         path: ./*.efi
-
-    - name: Download UEFI firmware
-      run: |
-        FW_ARCH=$(echo ${{ matrix.TARGET_TYPE }} | tr a-z A-Z)
-        FW_ZIP=${{ matrix.FW_BASE }}-${FW_ARCH}.zip
-        curl -O https://efi.akeo.ie/${{ matrix.FW_BASE }}/${FW_ZIP}
-        7z x ${FW_ZIP}
-        rm ${FW_ZIP}
-
-    - name: Build image directory
-      run: |
-        mkdir -p image/efi/boot
-        cp boot${{ matrix.TARGET_TYPE }}.efi image/efi/boot
-
-    - name: Run tests
-      # Qemu doesn't support -smbios for RISCV64, so we don't run the tests there
-      if: matrix.TARGET_TYPE != 'riscv64'
-      run: |
-         export QEMU_CMD="qemu-system-${{ matrix.QEMU_ARCH }} ${{ matrix.QEMU_OPTS }} -smbios type=0,vendor=\"GitHub Actions Test\",version=\"v1.0\" -L . -drive if=pflash,format=raw,unit=0,file=${{ matrix.FW_BASE }}.fd,readonly=on -drive format=raw,file=fat:rw:image -nodefaults -nographic -serial stdio -net none"
-         ./gen_tests.sh
-         ./run_tests.sh

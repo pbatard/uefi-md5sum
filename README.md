@@ -1,7 +1,8 @@
-[![Build status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Windows.yml?style=flat-square)](https://github.com/pbatard/uefi-md5sum/actions)
-[![Build status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Linux.yml?style=flat-square)](https://github.com/pbatard/uefi-md5sum/actions)
-[![Coverity Scan Build Status](https://img.shields.io/coverity/scan/29422.svg?style=flat-square)](https://scan.coverity.com/projects/pbatard-uefi-md5sum)
-[![Licence](https://img.shields.io/badge/license-GPLv2-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-2.0.en.html)
+[![Windows Build Status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Windows.yml?style=flat-square&label=VS2022/gnu-efi%20Build)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Windows.yml)
+[![Linux Build status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Linux.yml?style=flat-square&label=gcc/EDK2%20Build)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Linux.yml)
+[![Tests status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Tests.yml?style=flat-square&label=Tests)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Tests.yml)
+[![Coverity Scan Build Status](https://img.shields.io/coverity/scan/29422.svg?style=flat-square&label=Coverity)](https://scan.coverity.com/projects/pbatard-uefi-md5sum)
+[![Licence](https://img.shields.io/badge/license-GPLv2-blue.svg?style=flat-square&label=License)](https://www.gnu.org/licenses/gpl-2.0.en.html)
 
 uefi-md5sum - MD5 checksum validation for UEFI
 ==============================================

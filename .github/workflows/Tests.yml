@@ -1,0 +1,74 @@
+name: Tests (qemu with OVMF/AAVMF)
+
+on:
+  workflow_run:
+    workflows: [Linux (gcc with EDK2)]
+    types:
+      - completed
+
+jobs:
+  Tests:
+    # Only run if the Linux build workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+        # NB: Qemu doesn't support -smbios for RISCV64, so we don't run the tests there
+        - TARGET_TYPE: x64
+          TARGET_PKGS: qemu-system-x86
+          QEMU_ARCH: x86_64
+          QEMU_OPTS: -M q35
+          FW_BASE: OVMF
+        - TARGET_TYPE: ia32
+          TARGET_PKGS: qemu-system-x86
+          QEMU_ARCH: i386
+          QEMU_OPTS: -M pc
+          FW_BASE: OVMF
+        - TARGET_TYPE: aa64
+          TARGET_PKGS: qemu-system-arm
+          QEMU_ARCH: aarch64
+          QEMU_OPTS: -M virt -cpu cortex-a57
+          FW_BASE: AAVMF
+        - TARGET_TYPE: arm
+          TARGET_PKGS: qemu-system-arm
+          QEMU_ARCH: arm
+          QEMU_OPTS: -M virt -cpu cortex-a15
+          FW_BASE: AAVMF
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Linux environment
+      run: |
+        sudo apt-get update
+        sudo apt-get -y --no-install-recommends install ${{ matrix.TARGET_PKGS }}
+
+    - name: Download artifacts
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        run_id: ${{ github.event.workflow_run.id }}
+        name: uefi-md5sum
+
+    - name: Download UEFI firmware
+      run: |
+        FW_ARCH=$(echo ${{ matrix.TARGET_TYPE }} | tr a-z A-Z)
+        FW_ZIP=${{ matrix.FW_BASE }}-${FW_ARCH}.zip
+        curl -O https://efi.akeo.ie/${{ matrix.FW_BASE }}/${FW_ZIP}
+        7z x ${FW_ZIP}
+        rm ${FW_ZIP}
+
+    - name: Build image directory
+      run: |
+        mkdir -p image/efi/boot
+        cp boot${{ matrix.TARGET_TYPE }}.efi image/efi/boot
+
+    - name: Run tests
+      run: |
+         export QEMU_CMD="qemu-system-${{ matrix.QEMU_ARCH }} ${{ matrix.QEMU_OPTS }} -smbios type=0,vendor=\"GitHub Actions Test\",version=\"v1.0\" -L . -drive if=pflash,format=raw,unit=0,file=${{ matrix.FW_BASE }}.fd,readonly=on -drive format=raw,file=fat:rw:image -nodefaults -nographic -serial stdio -net none"
+         ./gen_tests.sh
+         ./run_tests.sh
