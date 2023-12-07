@@ -268,6 +268,7 @@ STATIC VOID Md5Final(HASH_CONTEXT* Context)
                                 from the hash list points to a directory.
   @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
   @retval EFI_NOT_FOUND         The target file could not be found on the media.
+  @retval EFI_END_OF_FILE       The file could not be read in full.
 **/
 EFI_STATUS HashFile(
 	IN CONST EFI_FILE_HANDLE Root,
@@ -279,7 +280,7 @@ EFI_STATUS HashFile(
 	EFI_FILE_HANDLE File = NULL;
 	EFI_FILE_INFO* Info = NULL;
 	HASH_CONTEXT Context = { {0} };
-	UINTN Size, ReadSize = 0;
+	UINTN Size, ReadSize;
 	UINT64 ReadBytes;
 	UINT8 Buffer[MD5_BUFFERSIZE];
 
@@ -318,7 +319,12 @@ EFI_STATUS HashFile(
 			goto out;
 		if (ReadSize == 0)
 			break;
-		Md5Write(&Context, Buffer, (UINTN)ReadSize);
+		Md5Write(&Context, Buffer, ReadSize);
+	}
+	// Report an error if we did not read the expected amount of data
+	if (ReadBytes != Info->FileSize) {
+		Status = EFI_END_OF_FILE;
+		goto out;
 	}
 	Md5Final(&Context);
 

@@ -64,7 +64,7 @@ extern BOOLEAN              IsTestMode;
 #define HASH_FILE           L"md5sum.txt"
 
 /* Used to center our output on screen */
-#define TEXT_POSITION_X     0
+#define TEXT_POSITION_X     2
 #define TEXT_POSITION_Y     5
 
 /* Number of failed entries we display beneath the validation line before looping back */
@@ -186,7 +186,7 @@ typedef struct {
 /* Hash list of <Size> Hash entries */
 typedef struct {
 	HASH_ENTRY* Entry;
-	UINTN       Size;
+	UINTN       NumEntries;
 	UINT8*      Buffer;
 	UINT64      TotalBytes;
 } HASH_LIST;
@@ -242,7 +242,7 @@ STATIC __inline UINTN _SafeStrLen(CONST CHAR16 * String, CONST CHAR8 * File, CON
   @retval TRUE   A test system was detected.
   @retval FALSE  A regular plaform is being used.
 **/
-extern BOOLEAN IsTestSystem(VOID);
+BOOLEAN IsTestSystem(VOID);
 
 /**
   Parse a hash sum list file and populate a HASH_LIST structure from it.
@@ -258,7 +258,7 @@ extern BOOLEAN IsTestSystem(VOID);
   @retval EFI_END_OF_FILE       The hash list file could not be read.
   @retval EFI_ABORTED           The hash list file contains invalid data.
 **/
-extern EFI_STATUS Parse(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT HASH_LIST* List);
+EFI_STATUS Parse(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT HASH_LIST* List);
 
 /**
   Compute the MD5 hash of a single file.
@@ -273,7 +273,7 @@ extern EFI_STATUS Parse(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OU
   @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
   @retval EFI_NOT_FOUND         The target file could not be found on the media.
 **/
-extern EFI_STATUS HashFile(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT UINT8* Hash);
+EFI_STATUS HashFile(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT UINT8* Hash);
 
 /**
   Convert a UTF-8 encoded string to a UCS-2 encoded string.

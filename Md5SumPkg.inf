@@ -34,11 +34,11 @@
   BaseLib
   DebugLib
   MemoryAllocationLib
+  PcdLib
   UefiApplicationEntryPoint
   UefiBootServicesTableLib
   UefiLib
   UefiRuntimeServicesTableLib
-  PcdLib
 
 [Guids]
   gEfiFileInfoGuid
@@ -57,4 +57,4 @@
   gEfiMdePkgTokenSpaceGuid.PcdUefiVariableDefaultPlatformLang
 
 [BuildOptions]
-  RELEASE_*_*_CC_FLAGS    = -Os -DMDEPKG_NDEBUG -DNDEBUG
+  RELEASE_*_*_CC_FLAGS    = -O2 -DMDEPKG_NDEBUG -DNDEBUG

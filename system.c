@@ -25,8 +25,9 @@
   @param[in]  TableGuid  The GUID of the system configuration table to seek.
   @param[out] Table      A pointer to the table structure to populate.
  
-  @retval EFI_SUCCESS    The table was found and the Table pointer was set.
-  @retval EFI_NOT_FOUND  The table could not be located in the system configuration.
+  @retval EFI_SUCCESS            The table was found and the Table pointer was set.
+  @retval EFI_NOT_FOUND          The table could not be located in the system configuration.
+  @retval EFI_INVALID_PARAMETER  One or more of the input parameters are invalid.
 **/
 STATIC EFI_STATUS GetSystemConfigurationTable(
 	IN EFI_GUID* TableGuid,
@@ -34,7 +35,9 @@ STATIC EFI_STATUS GetSystemConfigurationTable(
 )
 {
 	UINTN Index;
-	V_ASSERT(Table != NULL);
+
+	if (TableGuid == NULL || Table == NULL)
+		return EFI_INVALID_PARAMETER;
 
 	for (Index = 0; Index < gST->NumberOfTableEntries; Index++) {
 		if (COMPARE_GUID(TableGuid, &(gST->ConfigurationTable[Index].VendorGuid))) {
@@ -48,7 +51,7 @@ STATIC EFI_STATUS GetSystemConfigurationTable(
 /**
   Return the SMBIOS string matching the provided string number.
 
-  @param[in]  Smbios        Pointer to SMBIOS structure
+  @param[in]  Smbios        Pointer to SMBIOS structure.
   @param[in]  StringNumber  String number to return. 0xFFFF can be used to skip all
                             strings and point to the next SMBIOS structure.
   @retval     Pointer to a string (may be NULL if the string is not populated) or a
@@ -61,6 +64,9 @@ STATIC CHAR8* GetSmbiosString(
 {
 	UINT16 Index;
 	CHAR8* String;
+
+	if (Smbios == NULL)
+		return NULL;
 
 	// Skip over formatted section
 	String = (CHAR8*)(Smbios->Raw + Smbios->Hdr->Length);

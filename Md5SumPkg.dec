@@ -11,6 +11,3 @@
   PACKAGE_UNI_FILE               = Md5SumPkg.uni
   PACKAGE_GUID                   = B5FFEC2E-91BD-4DFB-B703-265DEEB856D8
   PACKAGE_VERSION                = 1.0
-
-[UserExtensions.TianoCore."ExtraFiles"]
-  Md5SumPkg-extra.uni

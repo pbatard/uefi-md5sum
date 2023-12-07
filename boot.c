@@ -28,8 +28,11 @@
  */
 BOOLEAN IsTestMode = FALSE;
 
-/* We'll use this string to erase a full line on the console */
-CHAR16* EmptyLine = NULL;
+/* We'll use this string to erase a line on the console */
+STATIC CHAR16 EmptyLine[STRING_MAX];
+
+/* Keep a copy of the main Image Handle */
+STATIC EFI_HANDLE MainImageHandle = NULL;
 
 /* Strings used to identify the plaform */
 #if defined(_M_X64) || defined(__x86_64__)
@@ -56,14 +59,14 @@ STATIC VOID DisplayBanner(
 	UINTN i, Len;
 	CHAR16* Line;
 
-	// Don't display the banner in test mode
-	if (IsTestMode)
-		return;
-
 	// The platform logo may still be displayed → remove it
 	gST->ConOut->ClearScreen(gST->ConOut);
 
-	V_ASSERT(Cols > 79);
+	// Make sure the console is large enough to accomodate the banner
+	// but not too insanely large...
+	if (Cols < 50 || Cols >= STRING_MAX)
+		return;
+
 	Line = AllocatePool((Cols + 1) * sizeof(CHAR16));
 	if (Line == NULL)
 		return;
@@ -104,7 +107,7 @@ STATIC VOID DisplayBanner(
 	Print(L"%c", BOXDRAW_UP_RIGHT);
 	for (i = 0; i < Cols - 2; i++)
 		Print(L"%c", BOXDRAW_HORIZONTAL);
-	Print(L"%c", BOXDRAW_UP_LEFT);
+	Print(L"%c\n", BOXDRAW_UP_LEFT);
 	DefText();
 
 	FreePool(Line);
@@ -117,7 +120,6 @@ STATIC VOID DisplayBanner(
   @param[in]  Status     The Status code from the failed operation on the entry.
   @param[in]  Path       A pointer to the CHAR16 string with the Path of the entry.
   @param[in]  NumFailed  The current number of failed entries.
-
 **/
 STATIC VOID PrintFailedEntry(
 	IN CONST EFI_STATUS Status,
@@ -125,27 +127,27 @@ STATIC VOID PrintFailedEntry(
 	IN CONST UINTN NumFailed
 )
 {
+	if (!EFI_ERROR(Status) || Path == NULL)
+		return;
+
 	// Truncate the path in case it's very long.
 	// TODO: Ideally we'd want long path reduction similar to what Windows does.
 	if (SafeStrLen(Path) > 80)
 		Path[80] = L'\0';
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 +
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2 +
 		(NumFailed % FAILED_ENTRIES_MAX));
-	if (EmptyLine != NULL && !IsTestMode)
-		Print(EmptyLine);
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 4 +
-		(NumFailed % FAILED_ENTRIES_MAX));
+	if (!IsTestMode) {
+		gST->ConOut->OutputString(gST->ConOut, EmptyLine);
+		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2 +
+			(NumFailed % FAILED_ENTRIES_MAX));
+	}
 	PrintError(L"File '%s'", Path);
 }
 
 /**
   Exit-specific processing for test/debug
-
-  @param[in]  NumFailed  The total number of failed entries.
 **/
-STATIC VOID ExitCheck(
-	IN INTN NumFailed
-)
+STATIC VOID ExitCheck(VOID)
 {
 #if defined(EFI_DEBUG)
 	UINTN Index;
@@ -157,8 +159,6 @@ STATIC VOID ExitCheck(
 
 	// If running debug, wait for a user keystroke and shut down
 #if defined(EFI_DEBUG)
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 5 +
-		MIN(NumFailed, FAILED_ENTRIES_MAX));
 	SetText(TEXT_YELLOW);
 	Print(L"Press any key to exit.\n");
 	DefText();
@@ -166,6 +166,42 @@ STATIC VOID ExitCheck(
 	gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
 	ShutDown();
 #endif
+}
+
+/**
+  Obtain the root handle of the current volume.
+
+  @param[out] Root              A pointer to the root file handle.
+
+  @retval EFI_SUCCESS           The root file handle was successfully populated.
+  @retval EFI_INVALID_PARAMETER The pointer to the root file handle is invalid.
+**/
+STATIC EFI_STATUS GetRootHandle(
+	OUT EFI_FILE_HANDLE* Root
+)
+{
+	EFI_STATUS Status;
+	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
+	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
+
+	if (Root == NULL)
+		return EFI_INVALID_PARAMETER;
+
+	// Access the loaded image so we can open the current volume
+	Status = gBS->OpenProtocol(MainImageHandle, &gEfiLoadedImageProtocolGuid,
+		(VOID**)&LoadedImage, MainImageHandle,
+		NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (EFI_ERROR(Status))
+		return Status;
+
+	// Open the the root directory on the boot volume
+	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle,
+		&gEfiSimpleFileSystemProtocolGuid, (VOID**)&Volume,
+		MainImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+	if (EFI_ERROR(Status))
+		return Status;
+
+	return Volume->OpenVolume(Volume, Root);
 }
 
 /*
@@ -178,8 +214,6 @@ EFI_STATUS EFIAPI efi_main(
 )
 {
 	EFI_STATUS Status;
-	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
-	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
 	EFI_FILE_HANDLE Root;
 	EFI_INPUT_KEY Key;
 	HASH_LIST HashList = { 0 };
@@ -187,6 +221,9 @@ EFI_STATUS EFIAPI efi_main(
 	CHAR16 Path[PATH_MAX + 1], NumFailedString[32] = { 0 }, *PluralFiles;
 	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
 	UINTN i, Index, Cols, Rows, NumFailed = 0;
+
+	// Keep a global copy of the bootloader's image handle
+	MainImageHandle = BaseImageHandle;
 
 #if defined(_GNU_EFI)
 	InitializeLib(BaseImageHandle, SystemTable);
@@ -202,41 +239,31 @@ EFI_STATUS EFIAPI efi_main(
 		&Cols, &Rows);
 	if (EFI_ERROR(Status)) {
 		// Couldn't get the console dimensions
-		Cols = 80;
-		Rows = 40;
+		Cols = 60;
+		Rows = 20;
+	}
+	if (Cols >= STRING_MAX)
+		Cols = STRING_MAX - 1;
+
+	// Populate a blank line we can use to erase a line
+	for (i = 0; i < Cols; i++)
+		EmptyLine[i] = L' ';
+	EmptyLine[i] = L'\0';
+
+	// Display the static user-facing text if not in test mode
+	if (!IsTestMode) {
+		// Clear the input buffer
+		gST->ConIn->Reset(gST->ConIn, FALSE);
+		// Display the top banner
+		DisplayBanner(Cols);
+		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y);
+		Print(L"Media verification:\n");
+		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
 	}
 
-	// Display the top banner
-	DisplayBanner(Cols);
-
-	// Create the blank line we'll use to erase a line
-	EmptyLine = AllocateZeroPool((Cols + 1) * sizeof(CHAR16));
-	if (EmptyLine != NULL) {
-		for (i = 0; i < Cols; i++)
-			EmptyLine[i] = L' ';
-	}
-
-	// Access the loaded image so we can open the current volume
-	Status = gBS->OpenProtocol(BaseImageHandle, &gEfiLoadedImageProtocolGuid,
-		(VOID**)&LoadedImage, BaseImageHandle,
-		NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	Status = GetRootHandle(&Root);
 	if (EFI_ERROR(Status)) {
-		PrintError(L"Unable to access boot image interface");
-		goto out;
-	}
-
-	// Open the the root directory on the boot volume
-	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle,
-		&gEfiSimpleFileSystemProtocolGuid, (VOID**)&Volume,
-		BaseImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
-	if (EFI_ERROR(Status)) {
-		PrintError(L"Unable to open boot volume");
-		goto out;
-	}
-	Root = NULL;
-	Status = Volume->OpenVolume(Volume, &Root);
-	if (EFI_ERROR(Status)) {
-		PrintError(L"Unable to open root directory");
+		PrintError(L"Could not open root directory\n");
 		goto out;
 	}
 
@@ -244,30 +271,24 @@ EFI_STATUS EFIAPI efi_main(
 	Status = Parse(Root, HASH_FILE, &HashList);
 	if (EFI_ERROR(Status))
 		goto out;
+	PluralFiles = (HashList.NumEntries == 1) ? L"" : L"s";
 
 	if (IsTestMode) {
 		// Print any extra data we want to validate
 		Print(L"[TEST] TotalBytes = 0x%lX\n", HashList.TotalBytes);
-	} else {
-		// Position our output near the center of the screen
-		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y);
-		Print(L"Media verification - Press any key to cancel\n");
-		// Clear the input buffer
-		gST->ConIn->Reset(gST->ConIn, FALSE);
 	}
 
 	// Now go through each entry we parsed
-	PluralFiles = (HashList.Size == 1) ? L"" : L"s";
-	for (Index = 0; Index < HashList.Size; Index++) {
+	for (Index = 0; Index < HashList.NumEntries; Index++) {
 		// Check for user cancellation
 		if (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) != EFI_NOT_READY)
 			break;
 
 		// Report progress
 		if (!IsTestMode) {
-			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2);
+			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
 			Print(L"%d/%d file%s processed%s\n", Index,
-				HashList.Size, PluralFiles, NumFailedString);
+				HashList.NumEntries, PluralFiles, NumFailedString);
 		}
 
 		// Convert the expected hexascii hash to a binary value we can use
@@ -311,14 +332,17 @@ EFI_STATUS EFIAPI efi_main(
 	}
 
 	// Final progress report
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2);
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
 	Print(L"%d/%d file%s processed%s\n", Index,
-		HashList.Size, PluralFiles, NumFailedString);
+		HashList.NumEntries, PluralFiles, NumFailedString);
+
+	// Position subsequent console messages after our report
+	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 3 +
+		MIN(NumFailed, FAILED_ENTRIES_MAX));
 
 out:
 	SafeFree(HashList.Buffer);
-	SafeFree(EmptyLine);
-	ExitCheck(NumFailed);
+	ExitCheck();
 
 	return Status;
 }

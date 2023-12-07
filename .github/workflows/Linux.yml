@@ -24,19 +24,19 @@ jobs:
         include:
         - TARGET_TYPE: x64
           TARGET_ARCH: X64
-          TARGET_PKGS: python3-distutils nasm uuid-dev qemu-system-x86
+          TARGET_PKGS: gcc-multilib
         - TARGET_TYPE: ia32
           TARGET_ARCH: IA32
-          TARGET_PKGS: gcc-multilib python3-distutils nasm uuid-dev qemu-system-x86
+          TARGET_PKGS: gcc-multilib
         - TARGET_TYPE: aa64
           TARGET_ARCH: AARCH64
-          TARGET_PKGS: gcc-aarch64-linux-gnu python3-distutils uuid-dev qemu-system-arm
+          TARGET_PKGS: gcc-aarch64-linux-gnu
         - TARGET_TYPE: arm
           TARGET_ARCH: ARM
-          TARGET_PKGS: gcc-arm-linux-gnueabi python3-distutils uuid-dev qemu-system-arm
+          TARGET_PKGS: gcc-arm-linux-gnueabi
         - TARGET_TYPE: riscv64
           TARGET_ARCH: RISCV64
-          TARGET_PKGS: gcc-riscv64-linux-gnu python3-distutils uuid-dev qemu-system-misc
+          TARGET_PKGS: gcc-riscv64-linux-gnu
 
     steps:
     - name: Check out repository
@@ -58,7 +58,7 @@ jobs:
     - name: Set up Linux environment
       run: |
         sudo apt-get update
-        sudo apt-get -y --no-install-recommends install ${{ matrix.TARGET_PKGS }}
+        sudo apt-get -y --no-install-recommends install python3-distutils nasm uuid-dev ${{ matrix.TARGET_PKGS }}
 
     - name: Set up EDK2
       run: |

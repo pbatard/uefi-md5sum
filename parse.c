@@ -46,7 +46,7 @@ EFI_STATUS Parse(
 	EFI_FILE_INFO* Info = NULL;
 	UINT8* HashFile = NULL;
 	HASH_ENTRY* HashList = NULL;
-	UINTN i, c, Size, HashFileSize, NumLines, HashListSize, NumDigits;
+	UINTN i, c, Size, HashFileSize, NumLines, NumEntries, NumDigits;
 	UINT64 TotalBytes = 0;
 
 	if (Root == NULL || Path == NULL || List == NULL)
@@ -136,7 +136,7 @@ EFI_STATUS Parse(
 	}
 
 	// Now parse the file to populate the array
-	HashListSize = 0;
+	NumEntries = 0;
 	for (i = 0; i < HashFileSize; ) {
 		// Ignore whitespaces, control characters or anything non-ASCII
 		// (such as BOMs) that may precede a hash entry or a comment.
@@ -206,14 +206,14 @@ EFI_STATUS Parse(
 
 		// NUL-terminate the hash value, add it to our array and validate it
 		HashFile[i + HASH_HEXASCII_SIZE] = '\0';
-		HashList[HashListSize].Hash = (CHAR8*)&HashFile[i];
+		HashList[NumEntries].Hash = (CHAR8*)&HashFile[i];
 		for (; HashFile[i] != '\0'; i++) {
 			// Convert A-F to lowercase
 			if (HashFile[i] >= 'A' && HashFile[i] <= 'F')
 				HashFile[i] += 0x20;
 			if (!IsValidHexAscii(HashFile[i])) {
 				Status = EFI_ABORTED;
-				PrintError(L"Invalid data in '%a'", HashList[HashListSize].Hash);
+				PrintError(L"Invalid data in '%a'", HashList[NumEntries].Hash);
 				goto out;
 			}
 		}
@@ -223,7 +223,7 @@ EFI_STATUS Parse(
 			// Anything other than whitespace is illegal
 			if (!IsWhiteSpace(HashFile[i])) {
 				Status = EFI_ABORTED;
-				PrintError(L"Invalid data after '%a'", HashList[HashListSize].Hash);
+				PrintError(L"Invalid data after '%a'", HashList[NumEntries].Hash);
 				goto out;
 			}
 		}
@@ -244,17 +244,17 @@ EFI_STATUS Parse(
 		// Check for a path parsing error above or an illegal path length
 		if (i == c || i > c + PATH_MAX) {
 			Status = EFI_ABORTED;
-			PrintError(L"Invalid data after '%a'", HashList[HashListSize].Hash);
+			PrintError(L"Invalid data after '%a'", HashList[NumEntries].Hash);
 			goto out;
 		}
 		// NUL-terminate the path.
 		// Note that we can't overflow here since we added an extra 0x0A to our file.
 		HashFile[i++] = '\0';
-		HashList[HashListSize].Path = (CHAR8*)&HashFile[c];
-		HashListSize++;
+		HashList[NumEntries].Path = (CHAR8*)&HashFile[c];
+		NumEntries++;
 	}
 
-	List->Size = HashListSize;
+	List->NumEntries = NumEntries;
 	List->Buffer = HashFile;
 	List->Entry = HashList;
 	List->TotalBytes = TotalBytes;
