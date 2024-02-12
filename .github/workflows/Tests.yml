@@ -49,10 +49,11 @@ jobs:
         sudo apt-get -y --no-install-recommends install ${{ matrix.TARGET_PKGS }}
 
     - name: Download artifacts
-      uses: dawidd6/action-download-artifact@v2
+      uses: actions/download-artifact@v4
       with:
-        run_id: ${{ github.event.workflow_run.id }}
-        name: uefi-md5sum
+        run-id: ${{ github.event.workflow_run.id }}
+        name: ${{ matrix.TARGET_TYPE }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Download UEFI firmware
       run: |

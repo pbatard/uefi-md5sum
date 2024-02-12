@@ -77,7 +77,7 @@ jobs:
       run: sha256sum *.efi
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: uefi-md5sum
+        name: ${{ matrix.TARGET_TYPE }}
         path: ./*.efi
