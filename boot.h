@@ -1,6 +1,6 @@
 /*
  * uefi-md5sum: UEFI MD5Sum validator
- * Copyright © 2014-2023 Pete Batard <pete@akeo.ie>
+ * Copyright © 2023-2024 Pete Batard <pete@akeo.ie>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -63,12 +63,12 @@ extern BOOLEAN              IsTestMode;
 /* Name of the file containing the list of hashes */
 #define HASH_FILE           L"md5sum.txt"
 
-/* Used to center our output on screen */
-#define TEXT_POSITION_X     2
-#define TEXT_POSITION_Y     5
+/* Minimum dimensions we expect the console to accomodate */
+#define COLS_MIN            50
+#define ROWS_MIN            20
 
-/* Number of failed entries we display beneath the validation line before looping back */
-#define FAILED_ENTRIES_MAX  5
+/* Horizontal margins used for the console output */
+#define MARGIN_H            2
 
 /* Size of an MD5 hash */
 #define MD5_HASHSIZE        16

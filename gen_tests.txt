@@ -170,7 +170,7 @@
 >   dd if=/dev/urandom of=image/file$size bs=1 count=$size
 > done
 > (cd image; md5sum file* > md5sum.txt)
-129/129 files processed
+129/129 files processed [0 failed]
 < rm image/file*
 
 # MD5 dot directory
@@ -200,20 +200,20 @@
 > mkdir "image/dir 2"
 > dd if=/dev/urandom of="image/dir 2/file 2" bs=1k count=16
 > (cd image; find ./dir* -type f -exec md5sum {} \; > md5sum.txt)
-2/2 files processed
+2/2 files processed [0 failed]
 < rm -rf image/dir*
 
 # MD5 64KB random data
 > dd if=/dev/urandom of=image/file bs=1k count=64
 > (cd image; md5sum file* > md5sum.txt)
-1/1 file processed
+1/1 file processed [0 failed]
 < rm image/file*
 
 # MD5 same file twice
 > dd if=/dev/urandom of=image/file bs=1k count=8
 > (cd image; md5sum file* > md5sum.txt)
 > (cd image; md5sum file* >> md5sum.txt)
-2/2 files processed
+2/2 files processed [0 failed]
 < rm image/file*
 
 # MD5 bit flip in data
@@ -241,5 +241,5 @@
 > dd if=/dev/urandom of="image/VÅ lid中國.dat" bs=1k count=8
 > dd if=/dev/urandom of="image/テ レ ビ.dat" bs=1k count=16
 > (cd image; find *.dat -type f -exec md5sum {} \; > md5sum.txt)
-2/2 files processed
+2/2 files processed [0 failed]
 < rm -f image/*.dat

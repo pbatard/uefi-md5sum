@@ -1,6 +1,6 @@
 /*
  * uefi-md5sum: UEFI MD5Sum validator
- * Copyright © 2023 Pete Batard <pete@akeo.ie>
+ * Copyright © 2023-2024 Pete Batard <pete@akeo.ie>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,89 +28,38 @@
  */
 BOOLEAN IsTestMode = FALSE;
 
-/* We'll use this string to erase a line on the console */
+/* We'll use this string to erase lines on the console */
 STATIC CHAR16 EmptyLine[STRING_MAX];
 
 /* Keep a copy of the main Image Handle */
 STATIC EFI_HANDLE MainImageHandle = NULL;
 
-/* Strings used to identify the plaform */
-#if defined(_M_X64) || defined(__x86_64__)
-  STATIC CHAR16* Arch = L"x64";
-#elif defined(_M_IX86) || defined(__i386__)
-  STATIC CHAR16* Arch = L"ia32";
-#elif defined (_M_ARM64) || defined(__aarch64__)
-  STATIC CHAR16* Arch = L"aa64";
-#elif defined (_M_ARM) || defined(__arm__)
-  STATIC CHAR16* Arch = L"arm";
-#elif defined(_M_RISCV64) || (defined (__riscv) && (__riscv_xlen == 64))
-  STATIC CHAR16* Arch = L"riscv64";
-#else
-#  error Unsupported architecture
-#endif
+/* We'll need to reference the dimensions of the UEFI text console */
+STATIC struct {
+	UINTN Cols;
+	UINTN Rows;
+} Console = { COLS_MIN, ROWS_MIN };
+
+/* Variables used for progress tracking */
+STATIC UINTN ProgressLastCol = 0;
+STATIC BOOLEAN ProgressInit = FALSE;
+STATIC UINTN ProgressYPos = 5;
+STATIC UINTN ProgressPPos = 0;
 
 /**
-  Display a centered application banner
- **/
-STATIC VOID DisplayBanner(
-	IN UINTN Cols
-)
+  Print a centered message on the console.
+
+  @param[in]  Message    The text message to print.
+  @param[in]  YPos       The vertical position to print the message to.
+**/
+STATIC VOID PrintCentered(CHAR16* Message, UINTN YPos)
 {
-	UINTN i, Len;
-	CHAR16* Line;
+	UINTN MessagePos;
 
-	// The platform logo may still be displayed → remove it
-	gST->ConOut->ClearScreen(gST->ConOut);
-
-	// Make sure the console is large enough to accomodate the banner
-	// but not too insanely large...
-	if (Cols < 50 || Cols >= STRING_MAX)
-		return;
-
-	Line = AllocatePool((Cols + 1) * sizeof(CHAR16));
-	if (Line == NULL)
-		return;
-
-	Cols -= 1;
-	SetTextPosition(0, 0);
-	SetText(TEXT_REVERSED);
-	Print(L"%c", BOXDRAW_DOWN_RIGHT);
-	for (i = 0; i < Cols - 2; i++)
-		Print(L"%c", BOXDRAW_HORIZONTAL);
-	Print(L"%c", BOXDRAW_DOWN_LEFT);
-
-	SetTextPosition(0, 1);
-	UnicodeSPrint(Line, Cols, L"UEFI md5sum %s (%s)", VERSION_STRING, Arch);
-	Len = SafeStrLen(Line);
-	V_ASSERT(Len < Cols);
-	Print(L"%c", BOXDRAW_VERTICAL);
-	for (i = 1; i < (Cols - Len) / 2; i++)
-		Print(L" ");
-	Print(Line);
-	for (i += Len; i < Cols - 1; i++)
-		Print(L" ");
-	Print(L"%c", BOXDRAW_VERTICAL);
-
-	SetTextPosition(0, 2);
-	UnicodeSPrint(Line, Cols, L"<https://md5.akeo.ie>");
-	Len = SafeStrLen(Line);
-	V_ASSERT(Len < Cols);
-	Print(L"%c", BOXDRAW_VERTICAL);
-	for (i = 1; i < (Cols - Len) / 2; i++)
-		Print(L" ");
-	Print(Line);
-	for (i += Len; i < Cols - 1; i++)
-		Print(L" ");
-	Print(L"%c", BOXDRAW_VERTICAL);
-
-	SetTextPosition(0, 3);
-	Print(L"%c", BOXDRAW_UP_RIGHT);
-	for (i = 0; i < Cols - 2; i++)
-		Print(L"%c", BOXDRAW_HORIZONTAL);
-	Print(L"%c\n", BOXDRAW_UP_LEFT);
-	DefText();
-
-	FreePool(Line);
+	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2;
+	V_ASSERT(MessagePos > MARGIN_H);
+	SetTextPosition(MessagePos, YPos);
+	Print(L"%s\n", Message);
 }
 
 /**
@@ -134,12 +83,10 @@ STATIC VOID PrintFailedEntry(
 	// TODO: Ideally we'd want long path reduction similar to what Windows does.
 	if (SafeStrLen(Path) > 80)
 		Path[80] = L'\0';
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2 +
-		(NumFailed % FAILED_ENTRIES_MAX));
+	SetTextPosition(MARGIN_H, 1 + (NumFailed % (Console.Rows / 2 - 4)));
 	if (!IsTestMode) {
 		gST->ConOut->OutputString(gST->ConOut, EmptyLine);
-		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 2 +
-			(NumFailed % FAILED_ENTRIES_MAX));
+		SetTextPosition(MARGIN_H, 1 + (NumFailed % (Console.Rows / 2 - 4)));
 	}
 	PrintError(L"File '%s'", Path);
 }
@@ -160,7 +107,7 @@ STATIC VOID ExitCheck(VOID)
 	// If running debug, wait for a user keystroke and shut down
 #if defined(EFI_DEBUG)
 	SetText(TEXT_YELLOW);
-	Print(L"Press any key to exit.\n");
+	PrintCentered(L" [Press any key to exit] ", Console.Rows - 2);
 	DefText();
 	gST->ConIn->Reset(gST->ConIn, FALSE);
 	gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
@@ -204,6 +151,78 @@ STATIC EFI_STATUS GetRootHandle(
 	return Volume->OpenVolume(Volume, Root);
 }
 
+/**
+  Initialize the progress bar.
+
+  @param[in]  Message    The text message to print above the progress bar.
+  @param[in]  YPos       The vertical position the progress bar should be displayed.
+**/
+STATIC VOID InitProgress(CHAR16* Message, UINTN YPos)
+{
+	UINTN i, MessagePos;
+
+	ProgressInit = FALSE;
+
+
+	if (Console.Cols < COLS_MIN || Console.Rows < ROWS_MIN ||
+		Console.Cols >= STRING_MAX || IsTestMode)
+		return;
+
+	if (SafeStrLen(Message) > Console.Cols - MARGIN_H * 2 - 8)
+		return;
+
+	if (YPos > Console.Rows - 3)
+		YPos = Console.Rows - 3;
+
+	MessagePos = Console.Cols / 2 - (SafeStrLen(Message) + 6) / 2;
+	V_ASSERT(MessagePos > MARGIN_H);
+
+	ProgressLastCol = 0;
+	ProgressYPos = YPos;
+	ProgressPPos = MessagePos + SafeStrLen(Message) + 2;
+
+	SetTextPosition(MessagePos, ProgressYPos);
+	Print(L"%s: 0.0%%", Message);
+
+	SetTextPosition(MARGIN_H, ProgressYPos + 1);
+	for (i = 0; i < Console.Cols - MARGIN_H * 2; i++)
+		Print(L"░");
+
+	ProgressInit = TRUE;
+}
+
+/**
+  Update the progress bar.
+
+  @param[in]  CurValue   Updated current value within the progress bar.
+  @param[in]  MaxValue   Value at which the progress bar should display 100%.
+**/
+STATIC VOID PrintProgress(UINT64 CurValue, UINT64 MaxValue)
+{
+	UINTN CurCol, PerMille;
+
+	if (Console.Cols < COLS_MIN || Console.Cols >= STRING_MAX || IsTestMode || !ProgressInit)
+		return;
+
+	if (CurValue > MaxValue)
+		CurValue = MaxValue;
+
+	// Update the percentage figure
+	PerMille = (UINTN)((CurValue * 1000) / MaxValue);
+	SetTextPosition(ProgressPPos, ProgressYPos);
+	Print(L"%d.%d%%", PerMille / 10, PerMille % 10);
+
+	// Update the progress bar
+	CurCol = (UINTN)((CurValue * (Console.Cols - MARGIN_H * 2)) / MaxValue);
+	for (; CurCol > ProgressLastCol && ProgressLastCol < Console.Cols; ProgressLastCol++) {
+		SetTextPosition(MARGIN_H + ProgressLastCol, ProgressYPos + 1);
+		Print(L"%c", BLOCKELEMENT_FULL_BLOCK);
+	}
+
+	if (CurValue == MaxValue)
+		ProgressInit = FALSE;
+}
+
 /*
  * Application entry-point
  * NB: This must be set to 'efi_main' for gnu-efi crt0 compatibility
@@ -218,9 +237,9 @@ EFI_STATUS EFIAPI efi_main(
 	EFI_INPUT_KEY Key;
 	HASH_LIST HashList = { 0 };
 	CHAR8 c;
-	CHAR16 Path[PATH_MAX + 1], NumFailedString[32] = { 0 }, *PluralFiles;
+	CHAR16 Path[PATH_MAX + 1], Message[PATH_MAX];
 	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
-	UINTN i, Index, Cols, Rows, NumFailed = 0;
+	UINTN i, Index, NumFailed = 0;
 
 	// Keep a global copy of the bootloader's image handle
 	MainImageHandle = BaseImageHandle;
@@ -234,32 +253,29 @@ EFI_STATUS EFIAPI efi_main(
 	// It only produces or removes extra onscreen output.
 	IsTestMode = IsTestSystem();
 
+	// Clear the console
+	gST->ConOut->ClearScreen(gST->ConOut);
+
 	// Find the amount of console real-estate we have at out disposal
 	Status = gST->ConOut->QueryMode(gST->ConOut, gST->ConOut->Mode->Mode,
-		&Cols, &Rows);
+		&Console.Cols, &Console.Rows);
 	if (EFI_ERROR(Status)) {
 		// Couldn't get the console dimensions
-		Cols = 60;
-		Rows = 20;
+		Console.Cols = COLS_MIN;
+		Console.Rows = ROWS_MIN;
 	}
-	if (Cols >= STRING_MAX)
-		Cols = STRING_MAX - 1;
+	if (Console.Cols >= STRING_MAX)
+		Console.Cols = STRING_MAX - 1;
 
 	// Populate a blank line we can use to erase a line
-	for (i = 0; i < Cols; i++)
+	for (i = 0; i < Console.Cols; i++)
 		EmptyLine[i] = L' ';
 	EmptyLine[i] = L'\0';
 
-	// Display the static user-facing text if not in test mode
-	if (!IsTestMode) {
-		// Clear the input buffer
-		gST->ConIn->Reset(gST->ConIn, FALSE);
-		// Display the top banner
-		DisplayBanner(Cols);
-		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y);
-		Print(L"Media verification:\n");
-		SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
-	}
+	// Print the reference URL for this application
+	SetText(EFI_TEXT_ATTR(EFI_DARKGRAY, EFI_BLACK));
+	PrintCentered(L"https://md5.akeo.ie", 0);
+	DefText();
 
 	Status = GetRootHandle(&Root);
 	if (EFI_ERROR(Status)) {
@@ -271,12 +287,17 @@ EFI_STATUS EFIAPI efi_main(
 	Status = Parse(Root, HASH_FILE, &HashList);
 	if (EFI_ERROR(Status))
 		goto out;
-	PluralFiles = (HashList.NumEntries == 1) ? L"" : L"s";
 
 	if (IsTestMode) {
 		// Print any extra data we want to validate
 		Print(L"[TEST] TotalBytes = 0x%lX\n", HashList.TotalBytes);
 	}
+
+	InitProgress(L"Media verification", Console.Rows / 2 - 3);
+	SetText(TEXT_YELLOW);
+	if (!IsTestMode)
+		PrintCentered(L"[Press any key to cancel]", Console.Rows - 2);
+	DefText();
 
 	// Now go through each entry we parsed
 	for (Index = 0; Index < HashList.NumEntries; Index++) {
@@ -285,11 +306,7 @@ EFI_STATUS EFIAPI efi_main(
 			break;
 
 		// Report progress
-		if (!IsTestMode) {
-			SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
-			Print(L"%d/%d file%s processed%s\n", Index,
-				HashList.NumEntries, PluralFiles, NumFailedString);
-		}
+		PrintProgress(Index, HashList.NumEntries);
 
 		// Convert the expected hexascii hash to a binary value we can use
 		ZeroMem(ExpectedHash, sizeof(ExpectedHash));
@@ -324,21 +341,20 @@ EFI_STATUS EFIAPI efi_main(
 		}
 
 		// Report failures
-		if (EFI_ERROR(Status)) {
+		if (EFI_ERROR(Status))
 			PrintFailedEntry(Status, Path, NumFailed++);
-			UnicodeSPrint(NumFailedString, ARRAY_SIZE(NumFailedString),
-				L" [%d failed]", NumFailed);
-		}
 	}
 
 	// Final progress report
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 1);
-	Print(L"%d/%d file%s processed%s\n", Index,
-		HashList.NumEntries, PluralFiles, NumFailedString);
-
-	// Position subsequent console messages after our report
-	SetTextPosition(TEXT_POSITION_X, TEXT_POSITION_Y + 3 +
-		MIN(NumFailed, FAILED_ENTRIES_MAX));
+	PrintProgress(Index, HashList.NumEntries);
+	UnicodeSPrint(Message, ARRAY_SIZE(Message),
+		L"%d/%d file%s processed", Index, HashList.NumEntries,
+		(HashList.NumEntries == 1) ? L"" : L"s");
+	V_ASSERT(SafeStrLen(Message) < ARRAY_SIZE(Message));
+	UnicodeSPrint(&Message[SafeStrLen(Message)],
+		ARRAY_SIZE(Message) - SafeStrLen(Message),
+		L" [%d failed]", NumFailed);
+	PrintCentered(Message, ProgressYPos + 2);
 
 out:
 	SafeFree(HashList.Buffer);

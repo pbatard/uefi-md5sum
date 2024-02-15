@@ -44,6 +44,10 @@
   UefiLib|MdePkg/Library/UefiLib/UefiLib.inf
   UefiRuntimeServicesTableLib|MdePkg/Library/UefiRuntimeServicesTableLib/UefiRuntimeServicesTableLib.inf
 
+[LibraryClasses.IA32]
+  # Needed to fix an undefined reference to '__udivdi3' on IA32
+  NULL|CryptoPkg/Library/IntrinsicLib/IntrinsicLib.inf
+
 [LibraryClasses.ARM, LibraryClasses.AARCH64, LibraryClasses.RISCV64]
   NULL|ArmPkg/Library/CompilerIntrinsicsLib/CompilerIntrinsicsLib.inf
   NULL|MdePkg/Library/BaseStackCheckLib/BaseStackCheckLib.inf
