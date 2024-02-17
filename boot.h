@@ -50,6 +50,15 @@
 
 #endif /* __MAKEWITH_GNUEFI */
 
+/* For use with static analysers */
+#if defined(__GNUC__)
+#define NO_RETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define NO_RETURN __declspec(noreturn)
+#else
+#define NO_RETURN
+#endif
+
 /*
  * Global variables
  */
@@ -144,11 +153,15 @@ typedef UINT32              CHAR32;
 /*
  * Convenience macros to print informational, warning or error messages.
  */
-#define PrintInfo(fmt, ...)     do { SetText(TEXT_WHITE); Print(L"[INFO]"); DefText(); \
+extern UINTN AlertYPos;
+#define PrintInfo(fmt, ...)     do { SetTextPosition(MARGIN_H, AlertYPos++); \
+                                     SetText(TEXT_WHITE); Print(L"[INFO]"); DefText(); \
                                      Print(L" " fmt L"\n", ##__VA_ARGS__); } while(0)
-#define PrintWarning(fmt, ...)  do { SetText(TEXT_YELLOW); Print(L"[WARN]"); DefText(); \
+#define PrintWarning(fmt, ...)  do { SetTextPosition(MARGIN_H, AlertYPos++); \
+                                     SetText(TEXT_YELLOW); Print(L"[WARN]"); DefText(); \
                                      Print(L" " fmt L"\n", ##__VA_ARGS__); } while(0)
-#define PrintError(fmt, ...)    do { SetText(TEXT_RED); Print(L"[FAIL]"); DefText(); \
+#define PrintError(fmt, ...)    do { SetTextPosition(MARGIN_H, AlertYPos++); \
+                                     SetText(TEXT_RED); Print(L"[FAIL]"); DefText(); \
                                      Print(L" " fmt L": [%d] %r\n", ##__VA_ARGS__, (Status&0x7FFFFFFF), Status); } while (0)
 
 /* Convenience macro to position text on screen (when not running in test mode). */
@@ -210,16 +223,18 @@ STATIC __inline EFI_STATUS Sleep(UINTN MicroSeconds)
 }
 
 /* Shut down the system immediately */
-STATIC __inline VOID ShutDown()
+NO_RETURN STATIC __inline VOID ShutDown()
 {
 	gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+	while (1);
 }
 
 /* Freeze the system with current screen output, then shut it down after one hour */
-STATIC __inline VOID Halt()
+NO_RETURN STATIC __inline VOID Halt()
 {
 	Sleep((UINTN)3600 * 1000 * 1000);
 	gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+	while (1);
 }
 
 /*

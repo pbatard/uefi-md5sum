@@ -219,14 +219,14 @@
 # MD5 bit flip in data
 > echo "This is b test" > image/file
 > echo "ff22941336956098ae9a564289d1bf1b  file" > image/md5sum.txt
-[FAIL] File 'file': [27] CRC Error
+[FAIL] File 'file': [27] MD5 Checksum Error
 1/1 file processed [1 failed]
 < rm image/file*
 
 # MD5 bit flip in hash
 > echo "This is a test" > image/file
 > echo "ef22941336956098ae9a564289d1bf1b  file" > image/md5sum.txt
-[FAIL] File 'file': [27] CRC Error
+[FAIL] File 'file': [27] MD5 Checksum Error
 1/1 file processed [1 failed]
 < rm image/file*
 

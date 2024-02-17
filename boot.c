@@ -28,6 +28,9 @@
  */
 BOOLEAN IsTestMode = FALSE;
 
+/* Incremental vertical position at which we display alert messages */
+UINTN AlertYPos = ROWS_MIN / 2 + 1;
+
 /* We'll use this string to erase lines on the console */
 STATIC CHAR16 EmptyLine[STRING_MAX];
 
@@ -52,7 +55,10 @@ STATIC UINTN ProgressPPos = 0;
   @param[in]  Message    The text message to print.
   @param[in]  YPos       The vertical position to print the message to.
 **/
-STATIC VOID PrintCentered(CHAR16* Message, UINTN YPos)
+STATIC VOID PrintCentered(
+	IN CHAR16* Message,
+	IN UINTN YPos
+)
 {
 	UINTN MessagePos;
 
@@ -88,30 +94,42 @@ STATIC VOID PrintFailedEntry(
 		gST->ConOut->OutputString(gST->ConOut, EmptyLine);
 		SetTextPosition(MARGIN_H, 1 + (NumFailed % (Console.Rows / 2 - 4)));
 	}
-	PrintError(L"File '%s'", Path);
+	SetText(TEXT_RED);
+	Print(L"[FAIL]");
+	DefText();
+	// Display a more explicit message (than "CRC Error") for files that fail MD5
+	if ((Status & 0x7FFFFFFF) == 27)
+		Print(L" File '%s': [27] MD5 Checksum Error\n", Path);
+	else
+		Print(L" File '%s': [%d] %r\n", Path, (Status & 0x7FFFFFFF), Status);
 }
 
 /**
-  Exit-specific processing for test/debug
+  Exit-specific processing
 **/
-STATIC VOID ExitCheck(VOID)
+STATIC VOID ExitCheck(
+	IN EFI_STATUS Status
+)
 {
-#if defined(EFI_DEBUG)
 	UINTN Index;
-#endif
 
 	// If running in test mode, shut down QEMU
 	if (IsTestMode)
 		ShutDown();
 
-	// If running debug, wait for a user keystroke and shut down
+	// Wait for a user keystroke as needed
+#if !defined(EFI_DEBUG)
+	if (EFI_ERROR(Status)) {
+#endif
+		SetText(TEXT_YELLOW);
+		PrintCentered(L" [Press any key to exit] ", Console.Rows - 2);
+		DefText();
+		gST->ConIn->Reset(gST->ConIn, FALSE);
+		gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
 #if defined(EFI_DEBUG)
-	SetText(TEXT_YELLOW);
-	PrintCentered(L" [Press any key to exit] ", Console.Rows - 2);
-	DefText();
-	gST->ConIn->Reset(gST->ConIn, FALSE);
-	gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
-	ShutDown();
+		ShutDown();
+# else
+	}
 #endif
 }
 
@@ -157,7 +175,10 @@ STATIC EFI_STATUS GetRootHandle(
   @param[in]  Message    The text message to print above the progress bar.
   @param[in]  YPos       The vertical position the progress bar should be displayed.
 **/
-STATIC VOID InitProgress(CHAR16* Message, UINTN YPos)
+STATIC VOID InitProgress(
+	IN CHAR16* Message,
+	IN UINTN YPos
+)
 {
 	UINTN i, MessagePos;
 
@@ -197,7 +218,10 @@ STATIC VOID InitProgress(CHAR16* Message, UINTN YPos)
   @param[in]  CurValue   Updated current value within the progress bar.
   @param[in]  MaxValue   Value at which the progress bar should display 100%.
 **/
-STATIC VOID PrintProgress(UINT64 CurValue, UINT64 MaxValue)
+STATIC VOID PrintProgress(
+	IN UINT64 CurValue,
+	IN UINT64 MaxValue
+)
 {
 	UINTN CurCol, PerMille;
 
@@ -237,7 +261,7 @@ EFI_STATUS EFIAPI efi_main(
 	EFI_INPUT_KEY Key;
 	HASH_LIST HashList = { 0 };
 	CHAR8 c;
-	CHAR16 Path[PATH_MAX + 1], Message[PATH_MAX];
+	CHAR16 Path[PATH_MAX + 1], Message[128];
 	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
 	UINTN i, Index, NumFailed = 0;
 
@@ -266,6 +290,7 @@ EFI_STATUS EFIAPI efi_main(
 	}
 	if (Console.Cols >= STRING_MAX)
 		Console.Cols = STRING_MAX - 1;
+	AlertYPos = Console.Rows / 2 + 1;
 
 	// Populate a blank line we can use to erase a line
 	for (i = 0; i < Console.Cols; i++)
@@ -347,18 +372,16 @@ EFI_STATUS EFIAPI efi_main(
 
 	// Final progress report
 	PrintProgress(Index, HashList.NumEntries);
-	UnicodeSPrint(Message, ARRAY_SIZE(Message),
-		L"%d/%d file%s processed", Index, HashList.NumEntries,
-		(HashList.NumEntries == 1) ? L"" : L"s");
-	V_ASSERT(SafeStrLen(Message) < ARRAY_SIZE(Message));
-	UnicodeSPrint(&Message[SafeStrLen(Message)],
-		ARRAY_SIZE(Message) - SafeStrLen(Message),
+	UnicodeSPrint(Message, ARRAY_SIZE(Message), L"%d/%d file%s processed",
+		Index, HashList.NumEntries, (HashList.NumEntries == 1) ? L"" : L"s");
+	V_ASSERT(SafeStrLen(Message) < ARRAY_SIZE(Message) / 2);
+	UnicodeSPrint(&Message[SafeStrLen(Message)], ARRAY_SIZE(Message) - SafeStrLen(Message),
 		L" [%d failed]", NumFailed);
 	PrintCentered(Message, ProgressYPos + 2);
 
 out:
 	SafeFree(HashList.Buffer);
-	ExitCheck();
+	ExitCheck(Status);
 
 	return Status;
 }
