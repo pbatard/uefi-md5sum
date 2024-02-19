@@ -1,7 +1,7 @@
 ## @file
 #  MD5Sum Bootloader
 #
-#  Copyright (c) 2023, Pete Batard <pete@akeo.ie>
+#  Copyright (c) 2023-2024, Pete Batard <pete@akeo.ie>
 #
 #  SPDX-License-Identifier: GPL-2.0-or-later
 #

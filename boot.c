@@ -32,7 +32,7 @@ BOOLEAN IsTestMode = FALSE;
 UINTN AlertYPos = ROWS_MIN / 2 + 1;
 
 /* We'll use this string to erase lines on the console */
-STATIC CHAR16 EmptyLine[STRING_MAX];
+STATIC CHAR16 EmptyLine[STRING_MAX] = { 0 };
 
 /* Keep a copy of the main Image Handle */
 STATIC EFI_HANDLE MainImageHandle = NULL;
@@ -43,10 +43,25 @@ STATIC struct {
 	UINTN Rows;
 } Console = { COLS_MIN, ROWS_MIN };
 
+/* Strings used for platform identification */
+#if defined(_M_X64) || defined(__x86_64__)
+STATIC CHAR16* Arch = L"x64";
+#elif defined(_M_IX86) || defined(__i386__)
+STATIC CHAR16* Arch = L"ia32";
+#elif defined (_M_ARM64) || defined(__aarch64__)
+STATIC CHAR16* Arch = L"aa64";
+#elif defined (_M_ARM) || defined(__arm__)
+STATIC CHAR16* Arch = L"arm";
+#elif defined(_M_RISCV64) || (defined (__riscv) && (__riscv_xlen == 64))
+STATIC CHAR16* Arch = L"riscv64";
+#else
+#error Unsupported architecture
+#endif
+
 /* Variables used for progress tracking */
 STATIC UINTN ProgressLastCol = 0;
 STATIC BOOLEAN ProgressInit = FALSE;
-STATIC UINTN ProgressYPos = 5;
+STATIC UINTN ProgressYPos = ROWS_MIN / 2;
 STATIC UINTN ProgressPPos = 0;
 
 /**
@@ -62,9 +77,13 @@ STATIC VOID PrintCentered(
 {
 	UINTN MessagePos;
 
-	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2;
-	V_ASSERT(MessagePos > MARGIN_H);
-	SetTextPosition(MessagePos, YPos);
+	if (!IsTestMode) {
+		MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2;
+		V_ASSERT(MessagePos > MARGIN_H);
+		SetTextPosition(0, YPos);
+		Print(EmptyLine);
+		SetTextPosition(MessagePos, YPos);
+	}
 	Print(L"%s\n", Message);
 }
 
@@ -105,13 +124,89 @@ STATIC VOID PrintFailedEntry(
 }
 
 /**
-  Exit-specific processing
+  Display a countdown on screen.
+
+  @param[in]  Message   A message to display with the countdown.
+  @param[in]  Duration  The duration of the countdown (in ms).
 **/
-STATIC VOID ExitCheck(
-	IN EFI_STATUS Status
+STATIC VOID CountDown(
+	IN CHAR16* Message,
+	IN UINTN Duration
+)
+{
+	UINTN MessagePos, CounterPos;
+	INTN i;
+
+	if (IsTestMode)
+		return;
+
+	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2 - 1;
+	CounterPos = MessagePos + SafeStrLen(Message) + 2;
+	V_ASSERT(MessagePos > MARGIN_H);
+	SetTextPosition(0, Console.Rows - 2);
+	Print(EmptyLine);
+	SetTextPosition(MessagePos, Console.Rows - 2);
+	SetText(TEXT_YELLOW);
+	Print(L"[%s ", Message);
+
+	gST->ConIn->Reset(gST->ConIn, FALSE);
+	for (i = (INTN)Duration; i >= 0; i -= 200) {
+		// Allow the user to press a key to interrupt the countdown
+		if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY)
+			break;
+		if (i % 1000 == 0) {
+			SetTextPosition(CounterPos, Console.Rows - 2);
+			Print(L"%d]   ", i / 1000);
+		}
+		Sleep(200000);
+	}
+}
+
+/**
+  Process exit according to the multiple scenarios we want to handle
+  (Chain load the next bootloader, shutdown if test mode, etc.).
+
+  @param[in]  Status      The current EFI Status of the application.
+  @param[in]  DevicePath  (Optional) Device Path of a bootloader to chain load.
+**/
+STATIC EFI_STATUS ExitProcess(
+	IN EFI_STATUS Status,
+	IN EFI_DEVICE_PATH* DevicePath
 )
 {
 	UINTN Index;
+	EFI_HANDLE ImageHandle;
+	EFI_INPUT_KEY Key;
+	BOOLEAN RunCountDown = TRUE;
+
+	// If we have a bootloader to chain load, try to launch it
+	if (DevicePath != NULL) {
+		if (EFI_ERROR(Status) && !IsTestMode) {
+			// Ask the user if they want to continue
+			SetText(TEXT_YELLOW);
+			PrintCentered(L"Proceed with boot? [y/N]", Console.Rows - 2);
+			gST->ConIn->Reset(gST->ConIn, FALSE);
+			while (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) == EFI_NOT_READY);
+			if (Key.UnicodeChar != L'y' && Key.UnicodeChar != L'Y') {
+				SafeFree(DevicePath);
+				return Status;
+			}
+			RunCountDown = FALSE;
+		}
+		Status = gBS->LoadImage(FALSE, MainImageHandle, DevicePath, NULL, 0, &ImageHandle);
+		SafeFree(DevicePath);
+		if (Status == EFI_SUCCESS) {
+			if (RunCountDown)
+				CountDown(L"Launching next bootloader in", 3000);
+			if (!IsTestMode)
+				gST->ConOut->ClearScreen(gST->ConOut);
+			Status = gBS->StartImage(ImageHandle, NULL, NULL);
+		}
+		if (EFI_ERROR(Status)) {
+			SetTextPosition(MARGIN_H, Console.Rows / 2 + 1);
+			PrintError(L"Could not launch original bootloader");
+		}
+	}
 
 	// If running in test mode, shut down QEMU
 	if (IsTestMode)
@@ -122,7 +217,7 @@ STATIC VOID ExitCheck(
 	if (EFI_ERROR(Status)) {
 #endif
 		SetText(TEXT_YELLOW);
-		PrintCentered(L" [Press any key to exit] ", Console.Rows - 2);
+		PrintCentered(L"[Press any key to exit]", Console.Rows - 2);
 		DefText();
 		gST->ConIn->Reset(gST->ConIn, FALSE);
 		gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
@@ -131,17 +226,20 @@ STATIC VOID ExitCheck(
 # else
 	}
 #endif
+	return Status;
 }
 
 /**
-  Obtain the root handle of the current volume.
+  Obtain the device and root handle of the current volume.
 
+  @param[out] DeviceHandle      A pointer to the device handle.
   @param[out] Root              A pointer to the root file handle.
 
   @retval EFI_SUCCESS           The root file handle was successfully populated.
   @retval EFI_INVALID_PARAMETER The pointer to the root file handle is invalid.
 **/
 STATIC EFI_STATUS GetRootHandle(
+	OUT EFI_HANDLE* DeviceHandle,
 	OUT EFI_FILE_HANDLE* Root
 )
 {
@@ -149,7 +247,7 @@ STATIC EFI_STATUS GetRootHandle(
 	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
 	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
 
-	if (Root == NULL)
+	if (DeviceHandle == NULL || Root == NULL)
 		return EFI_INVALID_PARAMETER;
 
 	// Access the loaded image so we can open the current volume
@@ -158,6 +256,7 @@ STATIC EFI_STATUS GetRootHandle(
 		NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(Status))
 		return Status;
+	*DeviceHandle = LoadedImage->DeviceHandle;
 
 	// Open the the root directory on the boot volume
 	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle,
@@ -253,15 +352,17 @@ STATIC VOID PrintProgress(
  */
 EFI_STATUS EFIAPI efi_main(
 	IN EFI_HANDLE BaseImageHandle,
-	IN EFI_SYSTEM_TABLE *SystemTable
+	IN EFI_SYSTEM_TABLE* SystemTable
 )
 {
 	EFI_STATUS Status;
+	EFI_HANDLE DeviceHandle;
 	EFI_FILE_HANDLE Root;
+	EFI_DEVICE_PATH* DevicePath = NULL;
 	EFI_INPUT_KEY Key;
 	HASH_LIST HashList = { 0 };
 	CHAR8 c;
-	CHAR16 Path[PATH_MAX + 1], Message[128];
+	CHAR16 Path[PATH_MAX + 1], Message[128], LoaderPath[64];
 	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
 	UINTN i, Index, NumFailed = 0;
 
@@ -278,7 +379,8 @@ EFI_STATUS EFIAPI efi_main(
 	IsTestMode = IsTestSystem();
 
 	// Clear the console
-	gST->ConOut->ClearScreen(gST->ConOut);
+	if (!IsTestMode)
+		gST->ConOut->ClearScreen(gST->ConOut);
 
 	// Find the amount of console real-estate we have at out disposal
 	Status = gST->ConOut->QueryMode(gST->ConOut, gST->ConOut->Mode->Mode,
@@ -302,11 +404,17 @@ EFI_STATUS EFIAPI efi_main(
 	PrintCentered(L"https://md5.akeo.ie", 0);
 	DefText();
 
-	Status = GetRootHandle(&Root);
+	Status = GetRootHandle(&DeviceHandle, &Root);
 	if (EFI_ERROR(Status)) {
 		PrintError(L"Could not open root directory\n");
 		goto out;
 	}
+
+	// Look up the original boot loader for chain loading
+	UnicodeSPrint(LoaderPath, ARRAY_SIZE(LoaderPath),
+		L"\\efi\\boot\\boot%s_original.efi", Arch);
+	if (SetPathCase(Root, LoaderPath) == EFI_SUCCESS)
+		DevicePath = FileDevicePath(DeviceHandle, LoaderPath);
 
 	// Parse md5sum.txt to construct a hash list
 	Status = Parse(Root, HASH_FILE, &HashList);
@@ -381,7 +489,7 @@ EFI_STATUS EFIAPI efi_main(
 
 out:
 	SafeFree(HashList.Buffer);
-	ExitCheck(Status);
-
-	return Status;
+	if (Status == EFI_SUCCESS && NumFailed != 0)
+		Status = EFI_CRC_ERROR;
+	return ExitProcess(Status, DevicePath);
 }

@@ -397,6 +397,7 @@
     <ClCompile Include="..\boot.c" />
     <ClCompile Include="..\hash.c" />
     <ClCompile Include="..\parse.c" />
+    <ClCompile Include="..\path.c" />
     <ClCompile Include="..\system.c" />
     <ClCompile Include="..\utf8.c" />
   </ItemGroup>

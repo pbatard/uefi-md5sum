@@ -243,3 +243,22 @@
 > (cd image; find *.dat -type f -exec md5sum {} \; > md5sum.txt)
 2/2 files processed [0 failed]
 < rm -f image/*.dat
+
+# Invalid original bootloader
+> touch image/efi/boot/bootx64_original.efi
+> touch image/efi/boot/bootia32_original.efi
+> touch image/efi/boot/bootaa64_original.efi
+> touch image/efi/boot/bootarm_original.efi
+> dd if=/dev/urandom of=image/file bs=1k count=64
+> (cd image; md5sum file* > md5sum.txt)
+1/1 file processed [0 failed]
+[FAIL] Could not launch original bootloader: [3] Unsupported
+< rm -f image/efi/boot/*_original.efi
+
+# Chainload original bootloader
+> 7z x chainload_test.7z -y -o./image/efi/boot
+> dd if=/dev/urandom of=image/file bs=1k count=64
+> (cd image; md5sum file* > md5sum.txt)
+1/1 file processed [0 failed]
+Test bootloader
+< rm -f image/efi/boot/*_original.efi

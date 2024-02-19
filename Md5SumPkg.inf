@@ -4,7 +4,7 @@
 #  This bootloader performs MD5 sum validation from md5sum.txt,
 #  and then hands over to the orginial bootloader (boot###.org)
 #
-#  Copyright (c) 2023, Pete Batard <pete@akeo.ie>
+#  Copyright (c) 2023-2024, Pete Batard <pete@akeo.ie>
 #
 #  SPDX-License-Identifier: GPL-2.0-or-later
 #
@@ -22,6 +22,7 @@
   boot.c
   hash.c
   parse.c
+  path.c
   system.c
   utf8.c
 

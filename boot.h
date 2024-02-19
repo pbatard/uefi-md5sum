@@ -251,6 +251,53 @@ STATIC __inline UINTN _SafeStrLen(CONST CHAR16 * String, CONST CHAR8 * File, CON
 
 #define SafeStrLen(s) _SafeStrLen(s, __FILE__, __LINE__)
 
+/*
+ * Some UEFI firmwares have a *BROKEN* Unicode collation implementation
+ * so we must provide our own version of StriCmp for ASCII comparison...
+ */
+static __inline CHAR16 _tolower(CONST CHAR16 c)
+{
+	if (('A' <= c) && (c <= 'Z'))
+		return 'a' + (c - 'A');
+	return c;
+}
+
+STATIC __inline INTN _StriCmp(CONST CHAR16* s1, CONST CHAR16* s2)
+{
+	/* NB: SafeStrLen() will already have asserted if these condition are met */
+	if ((SafeStrLen(s1) >= STRING_MAX) || (SafeStrLen(s2) >= STRING_MAX))
+		return -1;
+	while ((*s1 != L'\0') && (_tolower(*s1) == _tolower(*s2)))
+		s1++, s2++;
+	return (INTN)(*s1 - *s2);
+}
+
+/*
+ * Secure string copy, that either uses the already secure version from
+ * EDK2, or duplicates it for gnu-efi and asserts on any error.
+ */
+STATIC __inline VOID _SafeStrCpy(CHAR16* Destination, UINTN DestMax,
+	CONST CHAR16* Source, CONST CHAR8* File, CONST UINTN Line) {
+#ifdef _GNU_EFI
+	P_ASSERT(File, Line, Destination != NULL);
+	P_ASSERT(File, Line, Source != NULL);
+	P_ASSERT(File, Line, DestMax != 0);
+	/*
+	 * EDK2 would use RSIZE_MAX, but we use the smaller PATH_MAX for
+	 * gnu-efi as it can help detect path overflows while debugging.
+	 */
+	P_ASSERT(File, Line, DestMax <= PATH_MAX);
+	P_ASSERT(File, Line, DestMax > StrLen(Source));
+	while (*Source != 0)
+		*(Destination++) = *(Source++);
+	*Destination = 0;
+#else
+	P_ASSERT(File, Line, StrCpyS(Destination, DestMax, Source) == 0);
+#endif
+}
+
+#define SafeStrCpy(d, l, s) _SafeStrCpy(d, l, s, __FILE__, __LINE__)
+
 /**
   Detect if we are running a test system by querying the SMBIOS vendor string.
 
@@ -302,3 +349,16 @@ EFI_STATUS HashFile(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT UI
   @retval EFI_BUFFER_TOO_SMALL   The output buffer is too small to hold the result.
 **/
 EFI_STATUS Utf8ToUcs2(IN CONST CHAR8* Utf8String, OUT CHAR16* Ucs2String, IN CONST UINTN Ucs2StringSize);
+
+/**
+  Fix the casing of a path to match the actual case of the referenced elements.
+
+  @param[in]     Root            A handle to the root partition.
+  @param[in/out] Path            The path to update.
+
+  @retval EFI_SUCCESS            The path was successfully updated.
+  @retval EFI_INVALID_PARAMETER  One or more of the input parameters are invalid.
+  @retval EFI_OUT_OF_RESOURCES   A memory allocation error occurred.
+  @retval EFI_NOT_FOUND          One of the path elements was not found.
+**/
+EFI_STATUS SetPathCase(CONST EFI_FILE_HANDLE Root, CHAR16* Path);
