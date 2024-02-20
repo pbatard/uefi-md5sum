@@ -18,30 +18,27 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\boot.c">
+    <ClCompile Include="..\src\boot.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\system.c">
+    <ClCompile Include="..\src\system.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\parse.c">
+    <ClCompile Include="..\src\parse.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\hash.c">
+    <ClCompile Include="..\src\hash.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\utf8.c">
+    <ClCompile Include="..\src\utf8.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\path.c">
+    <ClCompile Include="..\src\path.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\boot.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\version.h">
+    <ClInclude Include="..\src\boot.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

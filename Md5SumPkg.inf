@@ -19,12 +19,12 @@
   ENTRY_POINT                = efi_main
 
 [Sources]
-  boot.c
-  hash.c
-  parse.c
-  path.c
-  system.c
-  utf8.c
+  src/boot.c
+  src/hash.c
+  src/parse.c
+  src/path.c
+  src/system.c
+  src/utf8.c
 
 [Packages]
   Md5SumPkg.dec
