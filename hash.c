@@ -1,6 +1,6 @@
 /*
  * uefi-md5sum: UEFI MD5Sum validator - MD5 Hash functions
- * Copyright © 2023 Pete Batard <pete@akeo.ie>
+ * Copyright © 2023-2024 Pete Batard <pete@akeo.ie>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -269,6 +269,7 @@ STATIC VOID Md5Final(HASH_CONTEXT* Context)
   @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
   @retval EFI_NOT_FOUND         The target file could not be found on the media.
   @retval EFI_END_OF_FILE       The file could not be read in full.
+  @retval EFI_ABORTED           User cancelled the operation.
 **/
 EFI_STATUS HashFile(
 	IN CONST EFI_FILE_HANDLE Root,
@@ -276,6 +277,7 @@ EFI_STATUS HashFile(
 	OUT UINT8* Hash
 )
 {
+	STATIC UINTN BlocksProcessed = 0;
 	EFI_STATUS Status = EFI_INVALID_PARAMETER;
 	EFI_FILE_HANDLE File = NULL;
 	EFI_FILE_INFO* Info = NULL;
@@ -320,6 +322,13 @@ EFI_STATUS HashFile(
 		if (ReadSize == 0)
 			break;
 		Md5Write(&Context, Buffer, ReadSize);
+		// Check for user cancel every few blocks
+		if (BlocksProcessed++ % MD5_CHECK_CANCEL == 0) {
+			if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY) {
+				Status = EFI_ABORTED;
+				goto out;
+			}
+		}
 	}
 	// Report an error if we did not read the expected amount of data
 	if (ReadBytes != Info->FileSize) {

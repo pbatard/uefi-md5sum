@@ -88,6 +88,9 @@ extern BOOLEAN              IsTestMode;
 /* Buffer size used for MD5 hashing */
 #define MD5_BUFFERSIZE      4096
 
+/* How many buffers we process between checks for user cancel */
+#define MD5_CHECK_CANCEL    64
+
 /* Size of the hexascii representation of a hash */
 #define HASH_HEXASCII_SIZE  (MD5_HASHSIZE * 2)
 

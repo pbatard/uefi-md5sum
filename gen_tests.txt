@@ -254,6 +254,7 @@
 1/1 file processed [0 failed]
 [FAIL] Could not launch original bootloader: [3] Unsupported
 < rm -f image/efi/boot/*_original.efi
+< rm image/file*
 
 # Chainload original bootloader
 > 7z x chainload_test.7z -y -o./image/efi/boot
@@ -262,3 +263,4 @@
 1/1 file processed [0 failed]
 Test bootloader
 < rm -f image/efi/boot/*_original.efi
+< rm image/file*

@@ -31,13 +31,13 @@ BOOLEAN IsTestMode = FALSE;
 /* Incremental vertical position at which we display alert messages */
 UINTN AlertYPos = ROWS_MIN / 2 + 1;
 
-/* We'll use this string to erase lines on the console */
+/* String used to erase a single line on the console */
 STATIC CHAR16 EmptyLine[STRING_MAX] = { 0 };
 
-/* Keep a copy of the main Image Handle */
+/* Copy of the main Image Handle */
 STATIC EFI_HANDLE MainImageHandle = NULL;
 
-/* We'll need to reference the dimensions of the UEFI text console */
+/* Dimensions of the UEFI text console */
 STATIC struct {
 	UINTN Cols;
 	UINTN Rows;
@@ -108,11 +108,12 @@ STATIC VOID PrintFailedEntry(
 	// TODO: Ideally we'd want long path reduction similar to what Windows does.
 	if (SafeStrLen(Path) > 80)
 		Path[80] = L'\0';
-	SetTextPosition(MARGIN_H, 1 + (NumFailed % (Console.Rows / 2 - 4)));
 	if (!IsTestMode) {
+		// Clear any existing text on this line
+		SetTextPosition(0, 1 + (NumFailed % (Console.Rows / 2 - 4)));
 		gST->ConOut->OutputString(gST->ConOut, EmptyLine);
-		SetTextPosition(MARGIN_H, 1 + (NumFailed % (Console.Rows / 2 - 4)));
 	}
+	SetTextPosition(MARGIN_H, 1 + (NumFailed % (Console.Rows / 2 - 4)));
 	SetText(TEXT_RED);
 	Print(L"[FAIL]");
 	DefText();
@@ -181,7 +182,7 @@ STATIC EFI_STATUS ExitProcess(
 
 	// If we have a bootloader to chain load, try to launch it
 	if (DevicePath != NULL) {
-		if (EFI_ERROR(Status) && !IsTestMode) {
+		if (EFI_ERROR(Status) && Status != EFI_ABORTED && !IsTestMode) {
 			// Ask the user if they want to continue
 			SetText(TEXT_YELLOW);
 			PrintCentered(L"Proceed with boot? [y/N]", Console.Rows - 2);
@@ -197,7 +198,7 @@ STATIC EFI_STATUS ExitProcess(
 		SafeFree(DevicePath);
 		if (Status == EFI_SUCCESS) {
 			if (RunCountDown)
-				CountDown(L"Launching next bootloader in", 3000);
+				CountDown(L"Proceeding in", 3000);
 			if (!IsTestMode)
 				gST->ConOut->ClearScreen(gST->ConOut);
 			Status = gBS->StartImage(ImageHandle, NULL, NULL);
@@ -359,7 +360,6 @@ EFI_STATUS EFIAPI efi_main(
 	EFI_HANDLE DeviceHandle;
 	EFI_FILE_HANDLE Root;
 	EFI_DEVICE_PATH* DevicePath = NULL;
-	EFI_INPUT_KEY Key;
 	HASH_LIST HashList = { 0 };
 	CHAR8 c;
 	CHAR16 Path[PATH_MAX + 1], Message[128], LoaderPath[64];
@@ -434,10 +434,6 @@ EFI_STATUS EFIAPI efi_main(
 
 	// Now go through each entry we parsed
 	for (Index = 0; Index < HashList.NumEntries; Index++) {
-		// Check for user cancellation
-		if (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) != EFI_NOT_READY)
-			break;
-
 		// Report progress
 		PrintProgress(Index, HashList.NumEntries);
 
@@ -466,12 +462,16 @@ EFI_STATUS EFIAPI efi_main(
 			Path[i] = L'\0';
 		} else {
 			// Hash the file and compare the result to the expected value
-			// TODO: We should also handle progress & cancellation in HashFile()
+			// TODO: handle progress in HashFile()
 			Status = HashFile(Root, Path, ComputedHash);
 			if (Status == EFI_SUCCESS &&
 				(CompareMem(ComputedHash, ExpectedHash, MD5_HASHSIZE) != 0))
 				Status = EFI_CRC_ERROR;
 		}
+
+		// Check for user cancellation
+		if (Status == EFI_ABORTED)
+			break;
 
 		// Report failures
 		if (EFI_ERROR(Status))
