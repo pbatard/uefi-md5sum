@@ -402,7 +402,7 @@
     <ClCompile Include="..\src\utf8.c" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\debug.vbs" />
+    <None Include="debug.vbs" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\boot.h" />

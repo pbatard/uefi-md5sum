@@ -35,4 +35,4 @@ in `/usr/src/edk2`:
 
 * The automated GitHub Actions build process is designed to run a very
 comprehensive list of tests under QEMU. You can find a detailed summary of
-all the tests being run in `gen_tests.txt`.
+all the tests being run in `tests/test_list.txt`.
