@@ -257,7 +257,7 @@
 < rm image/file*
 
 # Chainload original bootloader
-> 7z x chainload_test.7z -y -o./image/efi/boot
+> 7z x ./tests/chainload.7z -y -o./image/efi/boot
 > dd if=/dev/urandom of=image/file bs=1k count=64
 > (cd image; md5sum file* > md5sum.txt)
 1/1 file processed [0 failed]

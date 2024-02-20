@@ -9,7 +9,7 @@
 #
 ##
 
-TEST_DIR=./test
+TEST_DIR=./run
 LINE_LEN=60
 TIMEOUT=2m
 MIN_TEST="${1:-001}"

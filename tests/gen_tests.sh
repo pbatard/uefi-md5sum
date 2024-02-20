@@ -3,13 +3,13 @@
 ## @file
 #  Test generation script for MD5Sum.
 #
-#  Copyright (c) 2023, Pete Batard <pete@akeo.ie>
+#  Copyright (c) 2023-2024, Pete Batard <pete@akeo.ie>
 #
 #  SPDX-License-Identifier: GPL-2.0-or-later
 #
 ##
 
-TEST_DIR=test
+TEST_DIR=./run
 
 rm -rf $TEST_DIR
 mkdir $TEST_DIR
@@ -37,4 +37,4 @@ while IFS=$'\r\n' read -r line; do
   elif [[ ! -z "$line" ]]; then
     echo "${line}" >> "$data_file"
   fi
-done < gen_tests.txt
+done < $1
