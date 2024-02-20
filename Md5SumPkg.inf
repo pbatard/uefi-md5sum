@@ -20,9 +20,9 @@
 
 [Sources]
   src/boot.c
+  src/console.c
   src/hash.c
   src/parse.c
-  src/path.c
   src/system.c
   src/utf8.c
 

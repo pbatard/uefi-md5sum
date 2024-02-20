@@ -25,20 +25,8 @@
  */
 BOOLEAN IsTestMode = FALSE;
 
-/* Incremental vertical position at which we display alert messages */
-UINTN AlertYPos = ROWS_MIN / 2 + 1;
-
-/* String used to erase a single line on the console */
-STATIC CHAR16 EmptyLine[STRING_MAX] = { 0 };
-
 /* Copy of the main Image Handle */
 STATIC EFI_HANDLE MainImageHandle = NULL;
-
-/* Dimensions of the UEFI text console */
-STATIC struct {
-	UINTN Cols;
-	UINTN Rows;
-} Console = { COLS_MIN, ROWS_MIN };
 
 /* Strings used for platform identification */
 #if defined(_M_X64) || defined(__x86_64__)
@@ -55,109 +43,114 @@ STATIC CHAR16* Arch = L"riscv64";
 #error Unsupported architecture
 #endif
 
-/* Variables used for progress tracking */
-STATIC UINTN ProgressLastCol = 0;
-STATIC BOOLEAN ProgressInit = FALSE;
-STATIC UINTN ProgressYPos = ROWS_MIN / 2;
-STATIC UINTN ProgressPPos = 0;
-
 /**
-  Print a centered message on the console.
+  Obtain the device and root handle of the current volume.
 
-  @param[in]  Message    The text message to print.
-  @param[in]  YPos       The vertical position to print the message to.
+  @param[out] DeviceHandle      A pointer to the device handle.
+  @param[out] Root              A pointer to the root file handle.
+
+  @retval EFI_SUCCESS           The root file handle was successfully populated.
+  @retval EFI_INVALID_PARAMETER The pointer to the root file handle is invalid.
 **/
-STATIC VOID PrintCentered(
-	IN CHAR16* Message,
-	IN UINTN YPos
+STATIC EFI_STATUS GetRootHandle(
+	OUT EFI_HANDLE* DeviceHandle,
+	OUT EFI_FILE_HANDLE* RootHandle
 )
 {
-	UINTN MessagePos;
+	EFI_STATUS Status;
+	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
+	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
 
-	if (!IsTestMode) {
-		MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2;
-		V_ASSERT(MessagePos > MARGIN_H);
-		SetTextPosition(0, YPos);
-		Print(EmptyLine);
-		SetTextPosition(MessagePos, YPos);
-	}
-	Print(L"%s\n", Message);
+	if (DeviceHandle == NULL || RootHandle == NULL)
+		return EFI_INVALID_PARAMETER;
+
+	// Access the loaded image so we can open the current volume
+	Status = gBS->OpenProtocol(MainImageHandle, &gEfiLoadedImageProtocolGuid,
+		(VOID**)&LoadedImage, MainImageHandle,
+		NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (EFI_ERROR(Status))
+		return Status;
+	*DeviceHandle = LoadedImage->DeviceHandle;
+
+	// Open the the root directory on the boot volume
+	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle,
+		&gEfiSimpleFileSystemProtocolGuid, (VOID**)&Volume,
+		MainImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+	if (EFI_ERROR(Status))
+		return Status;
+
+	return Volume->OpenVolume(Volume, RootHandle);
 }
 
 /**
-  Print a hash entry that has failed processing.
-  Do this over a specific section of the console we cycle over.
+  Fix the casing of a path to match the actual case of the referenced elements.
 
-  @param[in]  Status     The Status code from the failed operation on the entry.
-  @param[in]  Path       A pointer to the CHAR16 string with the Path of the entry.
-  @param[in]  NumFailed  The current number of failed entries.
+  @param[in]     Root            A handle to the root partition.
+  @param[in/out] Path            The path to update.
+
+  @retval EFI_SUCCESS            The path was successfully updated.
+  @retval EFI_INVALID_PARAMETER  One or more of the input parameters are invalid.
+  @retval EFI_OUT_OF_RESOURCES   A memory allocation error occurred.
+  @retval EFI_NOT_FOUND          One of the path elements was not found.
 **/
-STATIC VOID PrintFailedEntry(
-	IN CONST EFI_STATUS Status,
-	IN CHAR16* Path,
-	IN CONST UINTN NumFailed
+STATIC EFI_STATUS SetPathCase(
+	CONST IN EFI_FILE_HANDLE Root,
+	IN CHAR16* Path
 )
 {
-	if (!EFI_ERROR(Status) || Path == NULL)
-		return;
+	CONST UINTN FileInfoSize = sizeof(EFI_FILE_INFO) + PATH_MAX * sizeof(CHAR16);
+	EFI_FILE_HANDLE FileHandle = NULL;
+	EFI_FILE_INFO* FileInfo;
+	UINTN i, Len;
+	UINTN Size;
+	EFI_STATUS Status;
 
-	// Truncate the path in case it's very long.
-	// TODO: Ideally we'd want long path reduction similar to what Windows does.
-	if (SafeStrLen(Path) > 80)
-		Path[80] = L'\0';
-	if (!IsTestMode) {
-		// Clear any existing text on this line
-		SetTextPosition(0, 1 + (NumFailed % (Console.Rows / 2 - 4)));
-		gST->ConOut->OutputString(gST->ConOut, EmptyLine);
+	if ((Root == NULL) || (Path == NULL) || (Path[0] != L'\\'))
+		return EFI_INVALID_PARAMETER;
+
+	FileInfo = (EFI_FILE_INFO*)AllocatePool(FileInfoSize);
+	if (FileInfo == NULL)
+		return EFI_OUT_OF_RESOURCES;
+
+	Len = SafeStrLen(Path);
+	/* The checks above ensure that Len is always >= 1, but just in case... */
+	V_ASSERT(Len >= 1);
+
+	// Find the last backslash in the path
+	for (i = Len - 1; (i != 0) && (Path[i] != L'\\'); i--);
+
+	if (i != 0) {
+		Path[i] = 0;
+		// Recursively fix the case
+		Status = SetPathCase(Root, Path);
+		if (EFI_ERROR(Status))
+			goto out;
 	}
-	SetTextPosition(MARGIN_H, 1 + (NumFailed % (Console.Rows / 2 - 4)));
-	SetText(TEXT_RED);
-	Print(L"[FAIL]");
-	DefText();
-	// Display a more explicit message (than "CRC Error") for files that fail MD5
-	if ((Status & 0x7FFFFFFF) == 27)
-		Print(L" File '%s': [27] MD5 Checksum Error\n", Path);
-	else
-		Print(L" File '%s': [%d] %r\n", Path, (Status & 0x7FFFFFFF), Status);
-}
 
-/**
-  Display a countdown on screen.
+	Status = Root->Open(Root, &FileHandle, (i == 0) ? L"\\" : Path, EFI_FILE_MODE_READ, 0);
+	if (EFI_ERROR(Status))
+		goto out;
 
-  @param[in]  Message   A message to display with the countdown.
-  @param[in]  Duration  The duration of the countdown (in ms).
-**/
-STATIC VOID CountDown(
-	IN CHAR16* Message,
-	IN UINTN Duration
-)
-{
-	UINTN MessagePos, CounterPos;
-	INTN i;
-
-	if (IsTestMode)
-		return;
-
-	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2 - 1;
-	CounterPos = MessagePos + SafeStrLen(Message) + 2;
-	V_ASSERT(MessagePos > MARGIN_H);
-	SetTextPosition(0, Console.Rows - 2);
-	Print(EmptyLine);
-	SetTextPosition(MessagePos, Console.Rows - 2);
-	SetText(TEXT_YELLOW);
-	Print(L"[%s ", Message);
-
-	gST->ConIn->Reset(gST->ConIn, FALSE);
-	for (i = (INTN)Duration; i >= 0; i -= 200) {
-		// Allow the user to press a key to interrupt the countdown
-		if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY)
-			break;
-		if (i % 1000 == 0) {
-			SetTextPosition(CounterPos, Console.Rows - 2);
-			Print(L"%d]   ", i / 1000);
+	do {
+		Size = FileInfoSize;
+		ZeroMem(FileInfo, Size);
+		Status = FileHandle->Read(FileHandle, &Size, (VOID*)FileInfo);
+		if (EFI_ERROR(Status))
+			goto out;
+		if (_StriCmp(&Path[i + 1], FileInfo->FileName) == 0) {
+			SafeStrCpy(&Path[i + 1], PATH_MAX, FileInfo->FileName);
+			Status = EFI_SUCCESS;
+			goto out;
 		}
-		Sleep(200000);
-	}
+		Status = EFI_NOT_FOUND;
+	} while (Size != 0);
+
+out:
+	Path[i] = L'\\';
+	if (FileHandle != NULL)
+		FileHandle->Close(FileHandle);
+	FreePool((VOID*)FileInfo);
+	return Status;
 }
 
 /**
@@ -169,7 +162,7 @@ STATIC VOID CountDown(
 **/
 STATIC EFI_STATUS ExitProcess(
 	IN EFI_STATUS Status,
-	IN EFI_DEVICE_PATH* DevicePath
+	IN OPTIONAL EFI_DEVICE_PATH* DevicePath
 )
 {
 	UINTN Index;
@@ -227,123 +220,6 @@ STATIC EFI_STATUS ExitProcess(
 	return Status;
 }
 
-/**
-  Obtain the device and root handle of the current volume.
-
-  @param[out] DeviceHandle      A pointer to the device handle.
-  @param[out] Root              A pointer to the root file handle.
-
-  @retval EFI_SUCCESS           The root file handle was successfully populated.
-  @retval EFI_INVALID_PARAMETER The pointer to the root file handle is invalid.
-**/
-STATIC EFI_STATUS GetRootHandle(
-	OUT EFI_HANDLE* DeviceHandle,
-	OUT EFI_FILE_HANDLE* Root
-)
-{
-	EFI_STATUS Status;
-	EFI_LOADED_IMAGE_PROTOCOL* LoadedImage;
-	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* Volume;
-
-	if (DeviceHandle == NULL || Root == NULL)
-		return EFI_INVALID_PARAMETER;
-
-	// Access the loaded image so we can open the current volume
-	Status = gBS->OpenProtocol(MainImageHandle, &gEfiLoadedImageProtocolGuid,
-		(VOID**)&LoadedImage, MainImageHandle,
-		NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
-	if (EFI_ERROR(Status))
-		return Status;
-	*DeviceHandle = LoadedImage->DeviceHandle;
-
-	// Open the the root directory on the boot volume
-	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle,
-		&gEfiSimpleFileSystemProtocolGuid, (VOID**)&Volume,
-		MainImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
-	if (EFI_ERROR(Status))
-		return Status;
-
-	return Volume->OpenVolume(Volume, Root);
-}
-
-/**
-  Initialize the progress bar.
-
-  @param[in]  Message    The text message to print above the progress bar.
-  @param[in]  YPos       The vertical position the progress bar should be displayed.
-**/
-STATIC VOID InitProgress(
-	IN CHAR16* Message,
-	IN UINTN YPos
-)
-{
-	UINTN i, MessagePos;
-
-	ProgressInit = FALSE;
-
-
-	if (Console.Cols < COLS_MIN || Console.Rows < ROWS_MIN ||
-		Console.Cols >= STRING_MAX || IsTestMode)
-		return;
-
-	if (SafeStrLen(Message) > Console.Cols - MARGIN_H * 2 - 8)
-		return;
-
-	if (YPos > Console.Rows - 3)
-		YPos = Console.Rows - 3;
-
-	MessagePos = Console.Cols / 2 - (SafeStrLen(Message) + 6) / 2;
-	V_ASSERT(MessagePos > MARGIN_H);
-
-	ProgressLastCol = 0;
-	ProgressYPos = YPos;
-	ProgressPPos = MessagePos + SafeStrLen(Message) + 2;
-
-	SetTextPosition(MessagePos, ProgressYPos);
-	Print(L"%s: 0.0%%", Message);
-
-	SetTextPosition(MARGIN_H, ProgressYPos + 1);
-	for (i = 0; i < Console.Cols - MARGIN_H * 2; i++)
-		Print(L"░");
-
-	ProgressInit = TRUE;
-}
-
-/**
-  Update the progress bar.
-
-  @param[in]  CurValue   Updated current value within the progress bar.
-  @param[in]  MaxValue   Value at which the progress bar should display 100%.
-**/
-STATIC VOID PrintProgress(
-	IN UINT64 CurValue,
-	IN UINT64 MaxValue
-)
-{
-	UINTN CurCol, PerMille;
-
-	if (Console.Cols < COLS_MIN || Console.Cols >= STRING_MAX || IsTestMode || !ProgressInit)
-		return;
-
-	if (CurValue > MaxValue)
-		CurValue = MaxValue;
-
-	// Update the percentage figure
-	PerMille = (UINTN)((CurValue * 1000) / MaxValue);
-	SetTextPosition(ProgressPPos, ProgressYPos);
-	Print(L"%d.%d%%", PerMille / 10, PerMille % 10);
-
-	// Update the progress bar
-	CurCol = (UINTN)((CurValue * (Console.Cols - MARGIN_H * 2)) / MaxValue);
-	for (; CurCol > ProgressLastCol && ProgressLastCol < Console.Cols; ProgressLastCol++) {
-		SetTextPosition(MARGIN_H + ProgressLastCol, ProgressYPos + 1);
-		Print(L"%c", BLOCKELEMENT_FULL_BLOCK);
-	}
-
-	if (CurValue == MaxValue)
-		ProgressInit = FALSE;
-}
-
 /*
  * Application entry-point
  * NB: This must be set to 'efi_main' for gnu-efi crt0 compatibility
@@ -375,31 +251,7 @@ EFI_STATUS EFIAPI efi_main(
 	// It only produces or removes extra onscreen output.
 	IsTestMode = IsTestSystem();
 
-	// Clear the console
-	if (!IsTestMode)
-		gST->ConOut->ClearScreen(gST->ConOut);
-
-	// Find the amount of console real-estate we have at out disposal
-	Status = gST->ConOut->QueryMode(gST->ConOut, gST->ConOut->Mode->Mode,
-		&Console.Cols, &Console.Rows);
-	if (EFI_ERROR(Status)) {
-		// Couldn't get the console dimensions
-		Console.Cols = COLS_MIN;
-		Console.Rows = ROWS_MIN;
-	}
-	if (Console.Cols >= STRING_MAX)
-		Console.Cols = STRING_MAX - 1;
-	AlertYPos = Console.Rows / 2 + 1;
-
-	// Populate a blank line we can use to erase a line
-	for (i = 0; i < Console.Cols; i++)
-		EmptyLine[i] = L' ';
-	EmptyLine[i] = L'\0';
-
-	// Print the reference URL for this application
-	SetText(EFI_TEXT_ATTR(EFI_DARKGRAY, EFI_BLACK));
-	PrintCentered(L"https://md5.akeo.ie", 0);
-	DefText();
+	InitConsole();
 
 	Status = GetRootHandle(&DeviceHandle, &Root);
 	if (EFI_ERROR(Status)) {

@@ -395,9 +395,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\boot.c" />
+    <ClCompile Include="..\src\console.c" />
     <ClCompile Include="..\src\hash.c" />
     <ClCompile Include="..\src\parse.c" />
-    <ClCompile Include="..\src\path.c" />
     <ClCompile Include="..\src\system.c" />
     <ClCompile Include="..\src\utf8.c" />
   </ItemGroup>

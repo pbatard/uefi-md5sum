@@ -153,10 +153,19 @@ typedef UINT32              CHAR32;
 #define SetText(attr)        do { if (!IsTestMode) gST->ConOut->SetAttribute(gST->ConOut, (attr)); } while(0)
 #define DefText()            do { if (!IsTestMode) gST->ConOut->SetAttribute(gST->ConOut, TEXT_DEFAULT); } while(0)
 
+/* Dimensions of the UEFI text console */
+typedef struct {
+	UINTN Cols;
+	UINTN Rows;
+} CONSOLE_DIMENSIONS;
+
+/* Console related globals */
+extern CONSOLE_DIMENSIONS Console;
+extern UINTN AlertYPos, ProgressYPos;
+
 /*
  * Convenience macros to print informational, warning or error messages.
  */
-extern UINTN AlertYPos;
 #define PrintInfo(fmt, ...)     do { SetTextPosition(MARGIN_H, AlertYPos++); \
                                      SetText(TEXT_WHITE); Print(L"[INFO]"); DefText(); \
                                      Print(L" " fmt L"\n", ##__VA_ARGS__); } while(0)
@@ -354,14 +363,64 @@ EFI_STATUS HashFile(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT UI
 EFI_STATUS Utf8ToUcs2(IN CONST CHAR8* Utf8String, OUT CHAR16* Ucs2String, IN CONST UINTN Ucs2StringSize);
 
 /**
-  Fix the casing of a path to match the actual case of the referenced elements.
-
-  @param[in]     Root            A handle to the root partition.
-  @param[in/out] Path            The path to update.
-
-  @retval EFI_SUCCESS            The path was successfully updated.
-  @retval EFI_INVALID_PARAMETER  One or more of the input parameters are invalid.
-  @retval EFI_OUT_OF_RESOURCES   A memory allocation error occurred.
-  @retval EFI_NOT_FOUND          One of the path elements was not found.
+  Console initialisation.
 **/
-EFI_STATUS SetPathCase(CONST EFI_FILE_HANDLE Root, CHAR16* Path);
+VOID InitConsole(VOID);
+
+/**
+  Print a centered message on the console.
+
+  @param[in]  Message    The text message to print.
+  @param[in]  YPos       The vertical position to print the message to.
+**/
+VOID PrintCentered(
+	IN CHAR16* Message,
+	IN UINTN YPos
+);
+
+/**
+  Print a hash entry that has failed processing.
+  Do this over a specific section of the console we cycle over.
+
+  @param[in]  Status     The Status code from the failed operation on the entry.
+  @param[in]  Path       A pointer to the CHAR16 string with the Path of the entry.
+  @param[in]  NumFailed  The current number of failed entries.
+**/
+VOID PrintFailedEntry(
+	IN CONST EFI_STATUS Status,
+	IN CHAR16* Path,
+	IN CONST UINTN NumFailed
+);
+
+/**
+  Display a countdown on screen.
+
+  @param[in]  Message   A message to display with the countdown.
+  @param[in]  Duration  The duration of the countdown (in ms).
+**/
+VOID CountDown(
+	IN CHAR16* Message,
+	IN UINTN Duration
+);
+
+/**
+  Initialize a progress bar.
+
+  @param[in]  Message    The text message to print above the progress bar.
+  @param[in]  YPos       The vertical position the progress bar should be displayed.
+**/
+VOID InitProgress(
+	IN CHAR16* Message,
+	IN UINTN YPos
+);
+
+/**
+  Update a progress bar.
+
+  @param[in]  CurValue   Updated current value within the progress bar.
+  @param[in]  MaxValue   Value at which the progress bar should display 100%.
+**/
+VOID PrintProgress(
+	IN UINT64 CurValue,
+	IN UINT64 MaxValue
+);

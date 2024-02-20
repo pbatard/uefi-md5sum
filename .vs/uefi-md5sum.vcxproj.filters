@@ -33,7 +33,7 @@
     <ClCompile Include="..\src\utf8.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\path.c">
+    <ClCompile Include="..\src\console.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
