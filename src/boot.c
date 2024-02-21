@@ -238,6 +238,7 @@ EFI_STATUS EFIAPI efi_main(
 	CHAR16 Path[PATH_MAX + 1], Message[128], LoaderPath[64];
 	UINT8 ComputedHash[MD5_HASHSIZE], ExpectedHash[MD5_HASHSIZE];
 	UINTN i, Index, NumFailed = 0;
+	PROGRESS_DATA Progress = { 0 };
 
 	// Keep a global copy of the bootloader's image handle
 	MainImageHandle = BaseImageHandle;
@@ -275,7 +276,12 @@ EFI_STATUS EFIAPI efi_main(
 		Print(L"[TEST] TotalBytes = 0x%lX\n", HashList.TotalBytes);
 	}
 
-	InitProgress(L"Media verification", Console.Rows / 2 - 3);
+	// Set up the progress bar data
+	Progress.Type = (HashList.TotalBytes == 0) ? PROGRESS_TYPE_FILE : PROGRESS_TYPE_BYTE;
+	Progress.Maximum = (HashList.TotalBytes == 0) ? HashList.NumEntries : HashList.TotalBytes;
+	Progress.Message = L"Media verification";
+	Progress.YPos = Console.Rows / 2 - 3;
+	InitProgress(&Progress);
 	SetText(TEXT_YELLOW);
 	if (!IsTestMode)
 		PrintCentered(L"[Press any key to cancel]", Console.Rows - 2);
@@ -283,9 +289,6 @@ EFI_STATUS EFIAPI efi_main(
 
 	// Now go through each entry we parsed
 	for (Index = 0; Index < HashList.NumEntries; Index++) {
-		// Report progress
-		PrintProgress(Index, HashList.NumEntries);
-
 		// Convert the expected hexascii hash to a binary value we can use
 		ZeroMem(ExpectedHash, sizeof(ExpectedHash));
 		for (i = 0; i < MD5_HASHSIZE * 2; i++) {
@@ -311,8 +314,7 @@ EFI_STATUS EFIAPI efi_main(
 			Path[i] = L'\0';
 		} else {
 			// Hash the file and compare the result to the expected value
-			// TODO: handle progress in HashFile()
-			Status = HashFile(Root, Path, ComputedHash);
+			Status = HashFile(Root, Path, &Progress, ComputedHash);
 			if (Status == EFI_SUCCESS &&
 				(CompareMem(ComputedHash, ExpectedHash, MD5_HASHSIZE) != 0))
 				Status = EFI_CRC_ERROR;
@@ -327,14 +329,13 @@ EFI_STATUS EFIAPI efi_main(
 			PrintFailedEntry(Status, Path, NumFailed++);
 	}
 
-	// Final progress report
-	PrintProgress(Index, HashList.NumEntries);
+	// Final report
 	UnicodeSPrint(Message, ARRAY_SIZE(Message), L"%d/%d file%s processed",
 		Index, HashList.NumEntries, (HashList.NumEntries == 1) ? L"" : L"s");
 	V_ASSERT(SafeStrLen(Message) < ARRAY_SIZE(Message) / 2);
 	UnicodeSPrint(&Message[SafeStrLen(Message)], ARRAY_SIZE(Message) - SafeStrLen(Message),
 		L" [%d failed]", NumFailed);
-	PrintCentered(Message, ProgressYPos + 2);
+	PrintCentered(Message, Progress.YPos + 2);
 
 out:
 	SafeFree(HashList.Buffer);

@@ -24,16 +24,8 @@ CONSOLE_DIMENSIONS Console = { COLS_MIN, ROWS_MIN };
 /* Incremental vertical position at which we display alert messages */
 UINTN AlertYPos = ROWS_MIN / 2 + 1;
 
-/* Vertical position of the progress bar */
-UINTN ProgressYPos = ROWS_MIN / 2;
-
 /* String used to erase a single line on the console */
 STATIC CHAR16 EmptyLine[STRING_MAX] = { 0 };
-
-/* Variables used for progress tracking */
-STATIC UINTN ProgressLastCol = 0;
-STATIC BOOLEAN ProgressInit = FALSE;
-STATIC UINTN ProgressPPos = 0;
 
 /**
   Console initialisation.
@@ -133,79 +125,75 @@ VOID PrintFailedEntry(
 /**
   Initialize a progress bar.
 
-  @param[in]  Message    The text message to print above the progress bar.
-  @param[in]  YPos       The vertical position the progress bar should be displayed.
+  @param[in]  Progress   A pointer to a PROGRESS_DATA structure.
 **/
 VOID InitProgress(
-	IN CHAR16* Message,
-	IN UINTN YPos
+	IN PROGRESS_DATA* Progress
 )
 {
 	UINTN i, MessagePos;
 
-	ProgressInit = FALSE;
+	Progress->Active = FALSE;
 
-
-	if (Console.Cols < COLS_MIN || Console.Rows < ROWS_MIN ||
-		Console.Cols >= STRING_MAX || IsTestMode)
+	if (Console.Cols < COLS_MIN || Console.Rows < ROWS_MIN || Console.Cols >= STRING_MAX ||
+		Progress->Message == NULL || IsTestMode)
 		return;
 
-	if (SafeStrLen(Message) > Console.Cols - MARGIN_H * 2 - 8)
+	if (SafeStrLen(Progress->Message) > Console.Cols - MARGIN_H * 2 - 8)
 		return;
 
-	if (YPos > Console.Rows - 3)
-		YPos = Console.Rows - 3;
+	if (Progress->YPos > Console.Rows - 3)
+		Progress->YPos = Console.Rows - 3;
 
-	MessagePos = Console.Cols / 2 - (SafeStrLen(Message) + 6) / 2;
+	MessagePos = Console.Cols / 2 - (SafeStrLen(Progress->Message) + 6) / 2;
 	V_ASSERT(MessagePos > MARGIN_H);
 
-	ProgressLastCol = 0;
-	ProgressYPos = YPos;
-	ProgressPPos = MessagePos + SafeStrLen(Message) + 2;
+	Progress->Current = 0;
+	Progress->LastCol = 0;
+	Progress->PPos = MessagePos + SafeStrLen(Progress->Message) + 2;
 
-	SetTextPosition(MessagePos, ProgressYPos);
-	Print(L"%s: 0.0%%", Message);
+	SetTextPosition(MessagePos, Progress->YPos);
+	Print(L"%s: 0.0%%", Progress->Message);
 
-	SetTextPosition(MARGIN_H, ProgressYPos + 1);
+	SetTextPosition(MARGIN_H, Progress->YPos + 1);
 	for (i = 0; i < Console.Cols - MARGIN_H * 2; i++)
 		Print(L"░");
 
-	ProgressInit = TRUE;
+	Progress->Active = TRUE;
 }
 
 /**
   Update a progress bar.
 
-  @param[in]  CurValue   Updated current value within the progress bar.
-  @param[in]  MaxValue   Value at which the progress bar should display 100%.
+  @param[in]  Progress   A pointer to a PROGRESS_DATA structure.
 **/
-VOID PrintProgress(
-	IN UINT64 CurValue,
-	IN UINT64 MaxValue
+VOID UpdateProgress(
+	IN PROGRESS_DATA* Progress
 )
 {
 	UINTN CurCol, PerMille;
 
-	if (Console.Cols < COLS_MIN || Console.Cols >= STRING_MAX || IsTestMode || !ProgressInit)
+	if (Progress == NULL || !Progress->Active || Progress->Maximum == 0 ||
+		Console.Cols < COLS_MIN || Console.Cols >= STRING_MAX || IsTestMode)
 		return;
 
-	if (CurValue > MaxValue)
-		CurValue = MaxValue;
+	if (Progress->Current > Progress->Maximum)
+		Progress->Current = Progress->Maximum;
 
 	// Update the percentage figure
-	PerMille = (UINTN)((CurValue * 1000) / MaxValue);
-	SetTextPosition(ProgressPPos, ProgressYPos);
+	PerMille = (UINTN)((Progress->Current * 1000) / Progress->Maximum);
+	SetTextPosition(Progress->PPos, Progress->YPos);
 	Print(L"%d.%d%%", PerMille / 10, PerMille % 10);
 
 	// Update the progress bar
-	CurCol = (UINTN)((CurValue * (Console.Cols - MARGIN_H * 2)) / MaxValue);
-	for (; CurCol > ProgressLastCol && ProgressLastCol < Console.Cols; ProgressLastCol++) {
-		SetTextPosition(MARGIN_H + ProgressLastCol, ProgressYPos + 1);
+	CurCol = (UINTN)((Progress->Current * (Console.Cols - MARGIN_H * 2)) / Progress->Maximum);
+	for (; CurCol > Progress->LastCol && Progress->LastCol < Console.Cols; Progress->LastCol++) {
+		SetTextPosition(MARGIN_H + Progress->LastCol, Progress->YPos + 1);
 		Print(L"%c", BLOCKELEMENT_FULL_BLOCK);
 	}
 
-	if (CurValue == MaxValue)
-		ProgressInit = FALSE;
+	if (Progress->Current == Progress->Maximum)
+		Progress->Active = FALSE;
 }
 
 /**

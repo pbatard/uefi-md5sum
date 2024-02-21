@@ -66,6 +66,16 @@
 /* Set to true when we are running the GitHub Actions tests */
 extern BOOLEAN              IsTestMode;
 
+/* Dimensions of the UEFI text console */
+typedef struct {
+	UINTN Cols;
+	UINTN Rows;
+} CONSOLE_DIMENSIONS;
+extern CONSOLE_DIMENSIONS   Console;
+
+/* Incremental vertical position at which we display alert messages */
+extern UINTN                AlertYPos;
+
 /* SMBIOS vendor name used by GitHub Actions' qemu when running the tests */
 #define TESTING_SMBIOS_NAME "GitHub Actions Test"
 
@@ -153,15 +163,21 @@ typedef UINT32              CHAR32;
 #define SetText(attr)        do { if (!IsTestMode) gST->ConOut->SetAttribute(gST->ConOut, (attr)); } while(0)
 #define DefText()            do { if (!IsTestMode) gST->ConOut->SetAttribute(gST->ConOut, TEXT_DEFAULT); } while(0)
 
-/* Dimensions of the UEFI text console */
-typedef struct {
-	UINTN Cols;
-	UINTN Rows;
-} CONSOLE_DIMENSIONS;
+/* Types of progress */
+#define PROGRESS_TYPE_FILE 0
+#define PROGRESS_TYPE_BYTE 1
 
-/* Console related globals */
-extern CONSOLE_DIMENSIONS Console;
-extern UINTN AlertYPos, ProgressYPos;
+/* Structure used for progress report */
+typedef struct {
+	UINT8         Type;      /* One of the types defined above */
+	BOOLEAN       Active;    /* Indicates that progress bar is active and can be updated */
+	UINTN         YPos;      /* Vertical position of the progress bar on the console */
+	UINTN         PPos;      /* Horizontal position of the percentage */
+	UINTN         LastCol;   /* Current horizontal position of the progress bar */
+	UINT64        Current;   /* Current progres value */
+	UINT64        Maximum;   /* Maximum progress value */
+	CONST CHAR16* Message;   /* Message that should be displayed above the progress bar */
+} PROGRESS_DATA;
 
 /*
  * Convenience macros to print informational, warning or error messages.
@@ -337,17 +353,26 @@ EFI_STATUS Parse(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT HASH_
 /**
   Compute the MD5 hash of a single file.
 
-  @param[in]     Root   A file handle to the root directory.
-  @param[in]     Path   A pointer to the CHAR16 string with the target path.
-  @param[in/out] Hash   A pointer to the 16-byte array that is to receive the hash.
+  @param[in]   Root             A file handle to the root directory.
+  @param[in]   Path             A pointer to the CHAR16 string with the target path.
+  @param[in]   Progress         (Optional) A pointer to a PROGRESS_DATA structure. If provided then
+                                the current progress value will be updated by this call.
+  @param[out]  Hash             A pointer to the 16-byte array that is to receive the hash.
 
   @retval EFI_SUCCESS           The file was successfully processed and the hash has been populated.
   @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid or one of the paths
-								from the hash list points to a directory.
+                                from the hash list points to a directory.
   @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
   @retval EFI_NOT_FOUND         The target file could not be found on the media.
+  @retval EFI_END_OF_FILE       The file could not be read in full.
+  @retval EFI_ABORTED           User cancelled the operation.
 **/
-EFI_STATUS HashFile(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT UINT8* Hash);
+EFI_STATUS HashFile(
+	IN CONST EFI_FILE_HANDLE Root,
+	IN CONST CHAR16* Path,
+	OPTIONAL IN PROGRESS_DATA* Progress,
+	OUT UINT8* Hash
+);
 
 /**
   Convert a UTF-8 encoded string to a UCS-2 encoded string.
@@ -406,21 +431,17 @@ VOID CountDown(
 /**
   Initialize a progress bar.
 
-  @param[in]  Message    The text message to print above the progress bar.
-  @param[in]  YPos       The vertical position the progress bar should be displayed.
+  @param[in]  Progress   A pointer to a PROGRESS_DATA structure.
 **/
 VOID InitProgress(
-	IN CHAR16* Message,
-	IN UINTN YPos
+	IN PROGRESS_DATA* Progress
 );
 
 /**
   Update a progress bar.
 
-  @param[in]  CurValue   Updated current value within the progress bar.
-  @param[in]  MaxValue   Value at which the progress bar should display 100%.
+  @param[in]  Progress   A pointer to a PROGRESS_DATA structure.
 **/
-VOID PrintProgress(
-	IN UINT64 CurValue,
-	IN UINT64 MaxValue
+VOID UpdateProgress(
+	IN PROGRESS_DATA* Progress
 );

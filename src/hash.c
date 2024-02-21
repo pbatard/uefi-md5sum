@@ -259,9 +259,11 @@ STATIC VOID Md5Final(HASH_CONTEXT* Context)
 /**
   Compute the MD5 hash of a single file.
 
-  @param[in]     Root   A file handle to the root directory.
-  @param[in]     Path   A pointer to the CHAR16 string with the target path.
-  @param[out]    Hash   A pointer to the 16-byte array that is to receive the hash.
+  @param[in]   Root             A file handle to the root directory.
+  @param[in]   Path             A pointer to the CHAR16 string with the target path.
+  @param[in]   Progress         (Optional) A pointer to a PROGRESS_DATA structure. If provided then
+                                the current progress value will be updated by this call.
+  @param[out]  Hash             A pointer to the 16-byte array that is to receive the hash.
 
   @retval EFI_SUCCESS           The file was successfully processed and the hash has been populated.
   @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid or one of the paths
@@ -274,6 +276,7 @@ STATIC VOID Md5Final(HASH_CONTEXT* Context)
 EFI_STATUS HashFile(
 	IN CONST EFI_FILE_HANDLE Root,
 	IN CONST CHAR16* Path,
+	OPTIONAL IN PROGRESS_DATA* Progress,
 	OUT UINT8* Hash
 )
 {
@@ -321,9 +324,13 @@ EFI_STATUS HashFile(
 			goto out;
 		if (ReadSize == 0)
 			break;
+		// Update the progress data (if byte type)
+		if (Progress != NULL && Progress->Type == PROGRESS_TYPE_BYTE)
+			Progress->Current += ReadSize;
 		Md5Write(&Context, Buffer, ReadSize);
-		// Check for user cancel every few blocks
+		// Check for user cancel and report progress every few blocks
 		if (BlocksProcessed++ % MD5_CHECK_CANCEL == 0) {
+			UpdateProgress(Progress);
 			if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY) {
 				Status = EFI_ABORTED;
 				goto out;
@@ -336,6 +343,10 @@ EFI_STATUS HashFile(
 		goto out;
 	}
 	Md5Final(&Context);
+	// Update the progress data (if file type)
+	if (Progress != NULL && Progress->Type == PROGRESS_TYPE_FILE)
+		Progress->Current++;
+	UpdateProgress(Progress);
 
 	CopyMem(Hash, Context.Buffer, MD5_HASHSIZE);
 	Status = EFI_SUCCESS;
