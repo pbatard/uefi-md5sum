@@ -57,7 +57,7 @@ VOID InitConsole(VOID)
 	EmptyLine[i] = L'\0';
 
 	// Print the reference URL of this application
-	SetText(EFI_TEXT_ATTR(EFI_DARKGRAY, EFI_BLACK));
+	SetText(TEXT_DARKGRAY);
 	PrintCentered(L"https://md5.akeo.ie", 0);
 	DefText();
 }
@@ -69,8 +69,8 @@ VOID InitConsole(VOID)
   @param[in]  YPos       The vertical position to print the message to.
 **/
 VOID PrintCentered(
-	IN CHAR16* Message,
-	IN UINTN YPos
+	IN CONST CHAR16* Message,
+	IN CONST UINTN YPos
 )
 {
 	UINTN MessagePos;
@@ -203,8 +203,8 @@ VOID UpdateProgress(
   @param[in]  Duration  The duration of the countdown (in ms).
 **/
 VOID CountDown(
-	IN CHAR16* Message,
-	IN UINTN Duration
+	IN CONST CHAR16* Message,
+	IN CONST UINTN Duration
 )
 {
 	UINTN MessagePos, CounterPos;

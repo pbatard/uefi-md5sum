@@ -156,6 +156,7 @@ typedef UINT32              CHAR32;
 #define TEXT_RED             EFI_TEXT_ATTR(EFI_LIGHTRED, EFI_BLACK)
 #define TEXT_GREEN           EFI_TEXT_ATTR(EFI_LIGHTGREEN, EFI_BLACK)
 #define TEXT_WHITE           EFI_TEXT_ATTR(EFI_WHITE, EFI_BLACK)
+#define TEXT_DARKGRAY        EFI_TEXT_ATTR(EFI_DARKGRAY, EFI_BLACK)
 
 /*
  * Set and restore the console text colour
@@ -348,7 +349,11 @@ BOOLEAN IsTestSystem(VOID);
   @retval EFI_END_OF_FILE       The hash list file could not be read.
   @retval EFI_ABORTED           The hash list file contains invalid data.
 **/
-EFI_STATUS Parse(IN CONST EFI_FILE_HANDLE Root, IN CONST CHAR16* Path, OUT HASH_LIST* List);
+EFI_STATUS Parse(
+	IN CONST EFI_FILE_HANDLE Root,
+	IN CONST CHAR16* Path,
+	OUT HASH_LIST* List
+);
 
 /**
   Compute the MD5 hash of a single file.
@@ -385,7 +390,11 @@ EFI_STATUS HashFile(
   @retval EFI_INVALID_PARAMETER  One or more of the input parameters are invalid.
   @retval EFI_BUFFER_TOO_SMALL   The output buffer is too small to hold the result.
 **/
-EFI_STATUS Utf8ToUcs2(IN CONST CHAR8* Utf8String, OUT CHAR16* Ucs2String, IN CONST UINTN Ucs2StringSize);
+EFI_STATUS Utf8ToUcs2(
+	IN CONST CHAR8* Utf8String,
+	OUT CHAR16* Ucs2String,
+	IN CONST UINTN Ucs2StringSize
+);
 
 /**
   Console initialisation.
@@ -399,8 +408,8 @@ VOID InitConsole(VOID);
   @param[in]  YPos       The vertical position to print the message to.
 **/
 VOID PrintCentered(
-	IN CHAR16* Message,
-	IN UINTN YPos
+	IN CONST CHAR16* Message,
+	IN CONST UINTN YPos
 );
 
 /**
@@ -424,8 +433,8 @@ VOID PrintFailedEntry(
   @param[in]  Duration  The duration of the countdown (in ms).
 **/
 VOID CountDown(
-	IN CHAR16* Message,
-	IN UINTN Duration
+	IN CONST CHAR16* Message,
+	IN CONST UINTN Duration
 );
 
 /**

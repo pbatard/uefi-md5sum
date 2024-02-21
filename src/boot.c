@@ -175,7 +175,7 @@ STATIC EFI_STATUS ExitProcess(
 		if (EFI_ERROR(Status) && Status != EFI_ABORTED && !IsTestMode) {
 			// Ask the user if they want to continue
 			SetText(TEXT_YELLOW);
-			PrintCentered(L"Proceed with boot? [y/N]", Console.Rows - 2);
+			PrintCentered(L"Continue with boot? [y/N]", Console.Rows - 2);
 			gST->ConIn->Reset(gST->ConIn, FALSE);
 			while (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) == EFI_NOT_READY);
 			if (Key.UnicodeChar != L'y' && Key.UnicodeChar != L'Y') {
@@ -188,7 +188,7 @@ STATIC EFI_STATUS ExitProcess(
 		SafeFree(DevicePath);
 		if (Status == EFI_SUCCESS) {
 			if (RunCountDown)
-				CountDown(L"Proceeding in", 3000);
+				CountDown(L"Continuing in", 3000);
 			if (!IsTestMode)
 				gST->ConOut->ClearScreen(gST->ConOut);
 			Status = gBS->StartImage(ImageHandle, NULL, NULL);
@@ -284,7 +284,7 @@ EFI_STATUS EFIAPI efi_main(
 	InitProgress(&Progress);
 	SetText(TEXT_YELLOW);
 	if (!IsTestMode)
-		PrintCentered(L"[Press any key to cancel]", Console.Rows - 2);
+		PrintCentered(L"[Press any key to skip]", Console.Rows - 2);
 	DefText();
 
 	// Now go through each entry we parsed

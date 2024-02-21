@@ -1,6 +1,6 @@
 /*
  * uefi-md5sum: UEFI MD5Sum validator - md5sum.txt parser
- * Copyright © 2023 Pete Batard <pete@akeo.ie>
+ * Copyright © 2023-2024 Pete Batard <pete@akeo.ie>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -188,7 +188,6 @@ EFI_STATUS Parse(
 				if (NumDigits == 0 || NumDigits > 16) {
 					PrintWarning(L"Ignoring invalid TotalBytes value");
 					TotalBytes = 0;
-					break;
 				}
 			}
 			continue;
