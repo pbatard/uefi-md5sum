@@ -29,7 +29,7 @@
 [FAIL] Invalid data in 'This entry is invalid and should': [21] Aborted
 
 # Hash containing NUL
-> echo "001122334455	6778899aabbccddeeff This hash contains a NUL" | tr '\11' '\0'  > image/md5sum.txt
+> echo "001122334455	6778899aabbccddeeff This hash contains a NUL" | tr '\11' '\0' > image/md5sum.txt
 [FAIL] 'md5sum.txt' contains invalid data: [21] Aborted
 
 # Hash containing space
@@ -41,24 +41,24 @@
 [FAIL] Invalid data in '00112233445566778899azbbccddeeff': [21] Aborted
 
 # Hash too short
-> echo "00112233445566778899aabbccddeef  Hash is too short"  > image/md5sum.txt
+> echo "00112233445566778899aabbccddeef  Hash is too short" > image/md5sum.txt
 [FAIL] Invalid data in '00112233445566778899aabbccddeef ': [21] Aborted
 
 # Hash too long
-> echo "00112233445566778899aabbccddeeffa Hash is too long"  > image/md5sum.txt
+> echo "00112233445566778899aabbccddeeffa Hash is too long" > image/md5sum.txt
 [FAIL] Invalid data after '00112233445566778899aabbccddeeff': [21] Aborted
 
 # Hash containing uppercase
-> echo "00112233445566778899AaBbCcDdEeFf Mixed case hash"  > image/md5sum.txt
+> echo "00112233445566778899AaBbCcDdEeFf Mixed case hash" > image/md5sum.txt
 [FAIL] File 'Mixed case hash': [14] Not Found
 1/1 file processed [1 failed]
 
 # Path containing NUL
-> echo "00112233445566778899aabbccddeeff This	path contains a NUL" | tr '\11' '\0'  > image/md5sum.txt
+> echo "00112233445566778899aabbccddeeff This	path contains a NUL" | tr '\11' '\0' > image/md5sum.txt
 [FAIL] 'md5sum.txt' contains invalid data: [21] Aborted
 
 # Path containing TAB
-> echo "00112233445566778899aabbccddeeff This file	name contains a TAB"  > image/md5sum.txt
+> echo "00112233445566778899aabbccddeeff This file	name contains a TAB" > image/md5sum.txt
 [FAIL] Invalid data after '00112233445566778899aabbccddeeff': [21] Aborted
 
 # Path too long
@@ -112,38 +112,38 @@
 
 # Empty TotalBytes
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
-> echo "# TotalBytes:" >> image/md5sum.txt
-[WARN] Ignoring invalid TotalBytes value
+> echo "# md5sum_totalbytes =" >> image/md5sum.txt
+[WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
 [FAIL] File 'file': [14] Not Found
 1/1 file processed [1 failed]
 
 # Invalid TotalBytes
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
-> echo "# TotalBytes: invalid" >> image/md5sum.txt
-[WARN] Ignoring invalid TotalBytes value
+> echo "# md5sum_totalbytes = invalid" >> image/md5sum.txt
+[WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
 [FAIL] File 'file': [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes invalid 0x prefix
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
-> echo "# TotalBytes: 0 x1234" >> image/md5sum.txt
-[WARN] Ignoring invalid TotalBytes value
+> echo "# md5sum_totalbytes = 0 x1234" >> image/md5sum.txt
+[WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
 [FAIL] File 'file': [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes missing 0x prefix
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
-> echo "# TotalBytes: 1234" >> image/md5sum.txt
-[WARN] Ignoring invalid TotalBytes value
+> echo "# md5sum_totalbytes = 1234" >> image/md5sum.txt
+[WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
 [FAIL] File 'file': [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes 1 character value
-> echo "# TotalBytes: 0x8  " > image/md5sum.txt
+> echo "# md5sum_totalbytes = 0x8  " > image/md5sum.txt
 > echo "00112233445566778899aabbccddeeff file" >> image/md5sum.txt
 [TEST] TotalBytes = 0x8
 [FAIL] File 'file': [14] Not Found
@@ -151,16 +151,30 @@
 
 # TotalBytes 16 characters value
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
-> echo "#TotalBytes: 0x12345678abcdef0" >> image/md5sum.txt
+> echo "#md5sum_totalbytes = 0x12345678abcdef0" >> image/md5sum.txt
 [TEST] TotalBytes = 0x12345678ABCDEF0
 [FAIL] File 'file': [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes 17 characters value
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
-> echo "# TotalBytes:    0xabcdabcdabcdabcd0   " >> image/md5sum.txt
-[WARN] Ignoring invalid TotalBytes value
+> echo "# md5sum_totalbytes =    0xabcdabcdabcdabcd0   " >> image/md5sum.txt
+[WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
+[FAIL] File 'file': [14] Not Found
+1/1 file processed [1 failed]
+
+# TotalBytes no spaces
+> echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
+> echo "#md5sum_totalbytes=0x1234abcd" >> image/md5sum.txt
+[TEST] TotalBytes = 0x1234ABCD
+[FAIL] File 'file': [14] Not Found
+1/1 file processed [1 failed]
+
+# TotalBytes multiple spaces
+> echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
+> echo "#   md5sum_totalbytes    =    0x1234abcd" >> image/md5sum.txt
+[TEST] TotalBytes = 0x1234ABCD
 [FAIL] File 'file': [14] Not Found
 1/1 file processed [1 failed]
 
