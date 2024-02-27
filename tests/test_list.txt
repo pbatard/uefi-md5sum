@@ -1,6 +1,6 @@
-# No Hash list
+# Missing Hash list
 > rm -f image/md5sum.txt
-[FAIL] Unable to locate 'md5sum.txt': [14] Not Found
+[FAIL] Unable to open 'md5sum.txt': [14] Not Found
 
 # Empty Hash list
 > rm -f image/md5sum.txt

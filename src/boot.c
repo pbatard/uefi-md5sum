@@ -173,14 +173,17 @@ STATIC EFI_STATUS ExitProcess(
 	// If we have a bootloader to chain load, try to launch it
 	if (DevicePath != NULL) {
 		if (EFI_ERROR(Status) && Status != EFI_ABORTED && !IsTestMode) {
-			// Ask the user if they want to continue
-			SetText(TEXT_YELLOW);
-			PrintCentered(L"Continue with boot? [y/N]", Console.Rows - 2);
-			gST->ConIn->Reset(gST->ConIn, FALSE);
-			while (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) == EFI_NOT_READY);
-			if (Key.UnicodeChar != L'y' && Key.UnicodeChar != L'Y') {
-				SafeFree(DevicePath);
-				return Status;
+			// Ask the user if they want to continue, unless md5sum.txt could
+			// not be found, in which case continue boot right away.
+			if (Status != EFI_NOT_FOUND) {
+				SetText(TEXT_YELLOW);
+				PrintCentered(L"Continue with boot? [y/N]", Console.Rows - 2);
+				gST->ConIn->Reset(gST->ConIn, FALSE);
+				while (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) == EFI_NOT_READY);
+				if (Key.UnicodeChar != L'y' && Key.UnicodeChar != L'Y') {
+					SafeFree(DevicePath);
+					return Status;
+				}
 			}
 			RunCountDown = FALSE;
 		}
@@ -266,7 +269,10 @@ EFI_STATUS EFIAPI efi_main(
 	if (SetPathCase(Root, LoaderPath) == EFI_SUCCESS)
 		DevicePath = FileDevicePath(DeviceHandle, LoaderPath);
 
-	// Parse md5sum.txt to construct a hash list
+	// Parse md5sum.txt to construct a hash list.
+	// We parse the full file, rather than process it line by line so that we
+	// can report progress and, unless md5sum_totalbytes is always specified at
+	// the beginning, progress requires knowing how many files we have to hash.
 	Status = Parse(Root, HASH_FILE, &HashList);
 	if (EFI_ERROR(Status))
 		goto out;

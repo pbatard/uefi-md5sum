@@ -345,6 +345,7 @@ BOOLEAN IsTestSystem(VOID);
   @retval EFI_SUCCESS           The file was successfully parsed and the hash list is populated.
   @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid.
   @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
+  @retval EFI_NOT_FOUND         The hash list file does not exist.
   @retval EFI_UNSUPPORTED       The hash list file is too small or too large.
   @retval EFI_END_OF_FILE       The hash list file could not be read.
   @retval EFI_ABORTED           The hash list file contains invalid data.

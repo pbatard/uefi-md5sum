@@ -31,6 +31,7 @@ STATIC CONST CHAR8 TotalBytesString[] = "md5sum_totalbytes";
   @retval EFI_SUCCESS           The file was successfully parsed and the hash list is populated.
   @retval EFI_INVALID_PARAMETER One or more of the input parameters are invalid.
   @retval EFI_OUT_OF_RESOURCES  A memory allocation error occurred.
+  @retval EFI_NOT_FOUND         The hash list file does not exist.
   @retval EFI_UNSUPPORTED       The hash list file is too small or too large.
   @retval EFI_END_OF_FILE       The hash list file could not be read.
   @retval EFI_ABORTED           The hash list file contains invalid data.
@@ -55,7 +56,10 @@ EFI_STATUS Parse(
 	// Look for the hash file on the boot partition
 	Status = Root->Open(Root, &File, (CHAR16*)Path, EFI_FILE_MODE_READ, EFI_FILE_READ_ONLY);
 	if (EFI_ERROR(Status)) {
-		PrintError(L"Unable to locate '%s'", Path);
+		// A missing md5sum.txt is not really an error, so don't
+		// report it, unless we're running in test mode.
+		if (Status != EFI_NOT_FOUND || IsTestMode)
+			PrintError(L"Unable to open '%s'", Path);
 		goto out;
 	}
 
