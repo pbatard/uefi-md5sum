@@ -277,10 +277,8 @@ EFI_STATUS EFIAPI efi_main(
 	if (EFI_ERROR(Status))
 		goto out;
 
-	if (IsTestMode) {
-		// Print any extra data we want to validate
-		Print(L"[TEST] TotalBytes = 0x%lX\n", HashList.TotalBytes);
-	}
+	// Print any extra data we want to validate
+	PrintTest(L"TotalBytes = 0x%lX", HashList.TotalBytes);
 
 	// Set up the progress bar data
 	Progress.Type = (HashList.TotalBytes == 0) ? PROGRESS_TYPE_FILE : PROGRESS_TYPE_BYTE;

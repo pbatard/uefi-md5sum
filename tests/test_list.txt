@@ -278,3 +278,33 @@
 Test bootloader
 < rm -f image/efi/boot/*_original.efi
 < rm image/file*
+
+# Chainload original bootloader without md5sum
+> 7z x ./tests/chainload.7z -y -o./image/efi/boot
+> rm -f md5sum.txt
+Test bootloader
+< rm -f image/efi/boot/*_original.efi
+
+# Progress with TotalBytes too small 
+> echo "# md5sum_totalbytes = 0x1" > image/md5sum.txt
+> for i in {64..1024..64}; do dd if=/dev/urandom of=image/file$i bs=1k count=$i; done
+> (cd image; md5sum file* >> md5sum.txt)
+[TEST] TotalBytes = 0x1
+16/16 files processed [0 failed]
+< rm image/file*
+
+# Progress with TotalBytes exact
+> echo "# md5sum_totalbytes = 0x880000" > image/md5sum.txt
+> for i in {64..1024..64}; do dd if=/dev/urandom of=image/file$i bs=1k count=$i; done
+> (cd image; md5sum file* >> md5sum.txt)
+[TEST] TotalBytes = 0x880000
+16/16 files processed [0 failed]
+< rm image/file*
+
+# Progress with TotalBytes too large 
+> echo "# md5sum_totalbytes = 0x1234567890abcdef" > image/md5sum.txt
+> for i in {64..1024..64}; do dd if=/dev/urandom of=image/file$i bs=1k count=$i; done
+> (cd image; md5sum file* >> md5sum.txt)
+[TEST] TotalBytes = 0x1234567890ABCDEF
+16/16 files processed [0 failed]
+< rm image/file*

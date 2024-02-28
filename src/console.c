@@ -75,9 +75,9 @@ VOID PrintCentered(
 {
 	UINTN MessagePos;
 
+	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2;
+	V_ASSERT(MessagePos > MARGIN_H);
 	if (!IsTestMode) {
-		MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2;
-		V_ASSERT(MessagePos > MARGIN_H);
 		SetTextPosition(0, YPos);
 		Print(EmptyLine);
 		SetTextPosition(MessagePos, YPos);
@@ -103,7 +103,6 @@ VOID PrintFailedEntry(
 		return;
 
 	// Truncate the path in case it's very long.
-	// TODO: Ideally we'd want long path reduction similar to what Windows does.
 	if (SafeStrLen(Path) > 80)
 		Path[80] = L'\0';
 	if (!IsTestMode) {
@@ -116,7 +115,7 @@ VOID PrintFailedEntry(
 	Print(L"[FAIL]");
 	DefText();
 	// Display a more explicit message (than "CRC Error") for files that fail MD5
-	if ((Status & 0x7FFFFFFF) == 27)
+	if (Status == EFI_CRC_ERROR)
 		Print(L" File '%s': [27] MD5 Checksum Error\n", Path);
 	else
 		Print(L" File '%s': [%d] %r\n", Path, (Status & 0x7FFFFFFF), Status);
@@ -135,8 +134,8 @@ VOID InitProgress(
 
 	Progress->Active = FALSE;
 
-	if (Console.Cols < COLS_MIN || Console.Rows < ROWS_MIN || Console.Cols >= STRING_MAX ||
-		Progress->Message == NULL || IsTestMode)
+	if (Console.Cols < COLS_MIN || Console.Rows < ROWS_MIN ||
+		Console.Cols >= STRING_MAX || Progress->Message == NULL)
 		return;
 
 	if (SafeStrLen(Progress->Message) > Console.Cols - MARGIN_H * 2 - 8)
@@ -152,12 +151,14 @@ VOID InitProgress(
 	Progress->LastCol = 0;
 	Progress->PPos = MessagePos + SafeStrLen(Progress->Message) + 2;
 
-	SetTextPosition(MessagePos, Progress->YPos);
-	Print(L"%s: 0.0%%", Progress->Message);
+	if (!IsTestMode) {
+		SetTextPosition(MessagePos, Progress->YPos);
+		Print(L"%s: 0.0%%", Progress->Message);
 
-	SetTextPosition(MARGIN_H, Progress->YPos + 1);
-	for (i = 0; i < Console.Cols - MARGIN_H * 2; i++)
-		Print(L"░");
+		SetTextPosition(MARGIN_H, Progress->YPos + 1);
+		for (i = 0; i < Console.Cols - MARGIN_H * 2; i++)
+			Print(L"░");
+	}
 
 	Progress->Active = TRUE;
 }
@@ -174,7 +175,7 @@ VOID UpdateProgress(
 	UINTN CurCol, PerMille;
 
 	if (Progress == NULL || !Progress->Active || Progress->Maximum == 0 ||
-		Console.Cols < COLS_MIN || Console.Cols >= STRING_MAX || IsTestMode)
+		Console.Cols < COLS_MIN || Console.Cols >= STRING_MAX)
 		return;
 
 	if (Progress->Current > Progress->Maximum)
@@ -182,14 +183,18 @@ VOID UpdateProgress(
 
 	// Update the percentage figure
 	PerMille = (UINTN)((Progress->Current * 1000) / Progress->Maximum);
-	SetTextPosition(Progress->PPos, Progress->YPos);
-	Print(L"%d.%d%%", PerMille / 10, PerMille % 10);
+	if (!IsTestMode) {
+		SetTextPosition(Progress->PPos, Progress->YPos);
+		Print(L"%d.%d%%", PerMille / 10, PerMille % 10);
+	}
 
 	// Update the progress bar
 	CurCol = (UINTN)((Progress->Current * (Console.Cols - MARGIN_H * 2)) / Progress->Maximum);
-	for (; CurCol > Progress->LastCol && Progress->LastCol < Console.Cols; Progress->LastCol++) {
-		SetTextPosition(MARGIN_H + Progress->LastCol, Progress->YPos + 1);
-		Print(L"%c", BLOCKELEMENT_FULL_BLOCK);
+	if (!IsTestMode) {
+		for (; CurCol > Progress->LastCol && Progress->LastCol < Console.Cols; Progress->LastCol++) {
+			SetTextPosition(MARGIN_H + Progress->LastCol, Progress->YPos + 1);
+			Print(L"%c", BLOCKELEMENT_FULL_BLOCK);
+		}
 	}
 
 	if (Progress->Current == Progress->Maximum)
@@ -210,12 +215,13 @@ VOID CountDown(
 	UINTN MessagePos, CounterPos;
 	INTN i;
 
-	if (IsTestMode)
-		return;
-
 	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2 - 1;
 	CounterPos = MessagePos + SafeStrLen(Message) + 2;
 	V_ASSERT(MessagePos > MARGIN_H);
+
+	if (IsTestMode)
+		return;
+
 	SetTextPosition(0, Console.Rows - 2);
 	Print(EmptyLine);
 	SetTextPosition(MessagePos, Console.Rows - 2);

@@ -136,9 +136,13 @@ typedef UINT32              CHAR32;
 #define ARRAY_SIZE(Array)   (sizeof(Array) / sizeof((Array)[0]))
 #endif
 
-/* Standard MIN() macro */
+/* Standard MIN/MAX macro */
 #ifndef MIN
 #define MIN(X, Y)            (((X) < (Y)) ? (X) : (Y))
+#endif
+
+#ifndef MAX
+#define MAX(X, Y)            (((X) > (Y)) ? (X) : (Y))
 #endif
 
 /* FreePool() replacement, that NULLs the freed pointer. */
@@ -192,6 +196,7 @@ typedef struct {
 #define PrintError(fmt, ...)    do { SetTextPosition(MARGIN_H, AlertYPos++); \
                                      SetText(TEXT_RED); Print(L"[FAIL]"); DefText(); \
                                      Print(L" " fmt L": [%d] %r\n", ##__VA_ARGS__, (Status&0x7FFFFFFF), Status); } while (0)
+#define PrintTest(fmt, ...)     do { if (IsTestMode) Print(L"[TEST] " fmt L"\n", ##__VA_ARGS__); } while(0)
 
 /* Convenience macro to position text on screen (when not running in test mode). */
 #define SetTextPosition(x, y)   do { if (!IsTestMode) gST->ConOut->SetCursorPosition(gST->ConOut, x, y);} while (0)
