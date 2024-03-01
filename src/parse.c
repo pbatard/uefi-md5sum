@@ -43,7 +43,7 @@ EFI_STATUS Parse(
 )
 {
 	EFI_STATUS Status;
-	EFI_FILE_HANDLE File;
+	EFI_FILE_HANDLE File = NULL;
 	EFI_FILE_INFO* Info = NULL;
 	UINT8* HashFile = NULL;
 	HASH_ENTRY* HashList = NULL;
@@ -268,6 +268,8 @@ EFI_STATUS Parse(
 
 out:
 	SafeFree(Info);
+	if (File != NULL)
+		File->Close(File);
 	if (EFI_ERROR(Status)) {
 		SafeFree(HashFile);
 		SafeFree(HashList);

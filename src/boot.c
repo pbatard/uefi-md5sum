@@ -177,6 +177,8 @@ STATIC EFI_STATUS ExitProcess(
 			// not be found, in which case continue boot right away.
 			if (Status != EFI_NOT_FOUND) {
 				SetText(TEXT_YELLOW);
+				// Give the user 1 hour to answer the question
+				gBS->SetWatchdogTimer(3600, 0x11D5, 0, NULL);
 				PrintCentered(L"Continue with boot? [y/N]", Console.Rows - 2);
 				gST->ConIn->Reset(gST->ConIn, FALSE);
 				while (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) == EFI_NOT_READY);
@@ -187,6 +189,8 @@ STATIC EFI_STATUS ExitProcess(
 			}
 			RunCountDown = FALSE;
 		}
+		// Reset the watchdog to the default 5 minutes timeout and system code
+		gBS->SetWatchdogTimer(300, 0, 0, NULL);
 		Status = gBS->LoadImage(FALSE, MainImageHandle, DevicePath, NULL, 0, &ImageHandle);
 		SafeFree(DevicePath);
 		if (Status == EFI_SUCCESS) {

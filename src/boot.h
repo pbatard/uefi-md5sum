@@ -96,10 +96,10 @@ extern UINTN                AlertYPos;
 #define MD5_BLOCKSIZE       64
 
 /* Buffer size used for MD5 hashing */
-#define MD5_BUFFERSIZE      4096
+#define MD5_BUFFERSIZE      65536
 
-/* How many buffers we process between checks for user cancel */
-#define MD5_CHECK_CANCEL    64
+/* Number of MD5 buffers to process for each MB of data */
+#define MD5_PROCESSED_1MB   ((1024 * 1024) / MD5_BUFFERSIZE)
 
 /* Size of the hexascii representation of a hash */
 #define HASH_HEXASCII_SIZE  (MD5_HASHSIZE * 2)
@@ -266,6 +266,8 @@ NO_RETURN STATIC __inline VOID ShutDown()
 /* Freeze the system with current screen output, then shut it down after one hour */
 NO_RETURN STATIC __inline VOID Halt()
 {
+	// Disable the watchdog timer, since we don't want an early reset
+	gBS->SetWatchdogTimer(0, 0, 0, NULL);
 	Sleep((UINTN)3600 * 1000 * 1000);
 	gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
 	while (1);

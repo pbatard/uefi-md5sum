@@ -281,10 +281,11 @@ EFI_STATUS HashFile(
 )
 {
 	STATIC UINTN BlocksProcessed = 0;
+	STATIC UINTN LastWatchDogReset = 0;
 	EFI_STATUS Status = EFI_INVALID_PARAMETER;
 	EFI_FILE_HANDLE File = NULL;
 	EFI_FILE_INFO* Info = NULL;
-	HASH_CONTEXT Context = { {0} };
+	HASH_CONTEXT Context = { 0 };
 	UINTN Size, ReadSize;
 	UINT64 ReadBytes;
 	UINT8 Buffer[MD5_BUFFERSIZE];
@@ -328,9 +329,15 @@ EFI_STATUS HashFile(
 		if (Progress != NULL && Progress->Type == PROGRESS_TYPE_BYTE)
 			Progress->Current += ReadSize;
 		Md5Write(&Context, Buffer, ReadSize);
-		// Check for user cancel and report progress every few blocks
-		if (BlocksProcessed++ % MD5_CHECK_CANCEL == 0) {
+		// Check for user cancel and report progress for each MB of data
+		if (BlocksProcessed++ % MD5_PROCESSED_1MB == 0) {
 			UpdateProgress(Progress);
+			// We need to set the watchdog timer regularly or else the UEFI firmware
+			// considers the bootloader stalled and resets the system. Do it for every
+			// 128 MB processed, as, with a default watchdog period of 5 mins, even
+			// very slow systems should be fine...
+			if (LastWatchDogReset++ % 128 == 0)
+				gBS->SetWatchdogTimer(300, 0x11D5, 0, NULL);
 			if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY) {
 				Status = EFI_ABORTED;
 				goto out;
