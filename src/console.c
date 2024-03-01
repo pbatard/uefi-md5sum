@@ -47,8 +47,8 @@ VOID InitConsole(VOID)
 		Console.Cols = COLS_MIN;
 		Console.Rows = ROWS_MIN;
 	}
-	if (Console.Cols >= STRING_MAX)
-		Console.Cols = STRING_MAX - 1;
+	if (Console.Cols >= PATH_MAX)
+		Console.Cols = PATH_MAX - 1;
 	AlertYPos = Console.Rows / 2 + 1;
 
 	// Populate a blank line we can use to erase a line
@@ -75,8 +75,8 @@ VOID PrintCentered(
 {
 	UINTN MessagePos;
 
-	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2;
-	V_ASSERT(MessagePos > MARGIN_H);
+	MessagePos = (Console.Cols / 2 > SafeStrLen(Message) / 2) ?
+		Console.Cols / 2 - SafeStrLen(Message) / 2 : 0;
 	if (!IsTestMode) {
 		SetTextPosition(0, YPos);
 		Print(EmptyLine);

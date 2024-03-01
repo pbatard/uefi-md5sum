@@ -290,6 +290,22 @@ Test bootloader
 > for i in {64..1024..64}; do dd if=/dev/urandom of=image/file$i bs=1k count=$i; done
 > (cd image; md5sum file* >> md5sum.txt)
 [TEST] TotalBytes = 0x1
+file1024 (1 MB)
+file128 (128 KB)
+file192 (192 KB)
+file256 (256 KB)
+file320 (320 KB)
+file384 (384 KB)
+file448 (448 KB)
+file512 (512 KB)
+file576 (576 KB)
+file64 (64 KB)
+file640 (640 KB)
+file704 (704 KB)
+file768 (768 KB)
+file832 (832 KB)
+file896 (896 KB)
+file960 (960 KB)
 16/16 files processed [0 failed]
 < rm image/file*
 
@@ -298,6 +314,22 @@ Test bootloader
 > for i in {64..1024..64}; do dd if=/dev/urandom of=image/file$i bs=1k count=$i; done
 > (cd image; md5sum file* >> md5sum.txt)
 [TEST] TotalBytes = 0x880000
+file1024 (1 MB)
+file128 (128 KB)
+file192 (192 KB)
+file256 (256 KB)
+file320 (320 KB)
+file384 (384 KB)
+file448 (448 KB)
+file512 (512 KB)
+file576 (576 KB)
+file64 (64 KB)
+file640 (640 KB)
+file704 (704 KB)
+file768 (768 KB)
+file832 (832 KB)
+file896 (896 KB)
+file960 (960 KB)
 16/16 files processed [0 failed]
 < rm image/file*
 
@@ -306,5 +338,21 @@ Test bootloader
 > for i in {64..1024..64}; do dd if=/dev/urandom of=image/file$i bs=1k count=$i; done
 > (cd image; md5sum file* >> md5sum.txt)
 [TEST] TotalBytes = 0x1234567890ABCDEF
+file1024 (1 MB)
+file128 (128 KB)
+file192 (192 KB)
+file256 (256 KB)
+file320 (320 KB)
+file384 (384 KB)
+file448 (448 KB)
+file512 (512 KB)
+file576 (576 KB)
+file64 (64 KB)
+file640 (640 KB)
+file704 (704 KB)
+file768 (768 KB)
+file832 (832 KB)
+file896 (896 KB)
+file960 (960 KB)
 16/16 files processed [0 failed]
 < rm image/file*

@@ -334,6 +334,33 @@ STATIC __inline VOID _SafeStrCpy(CHAR16* Destination, UINTN DestMax,
 
 #define SafeStrCpy(d, l, s) _SafeStrCpy(d, l, s, __FILE__, __LINE__)
 
+/*
+ * Secure string cat, that either uses the already secure version from
+ * EDK2, or duplicates its functionality for gnu-efi.
+ */
+STATIC __inline VOID _SafeStrCat(CHAR16* Destination, UINTN DestMax,
+	CONST CHAR16* Source, CONST CHAR8* File, CONST UINTN Line) {
+#ifdef _GNU_EFI
+	P_ASSERT(File, Line, Destination != NULL);
+	P_ASSERT(File, Line, Source != NULL);
+	P_ASSERT(File, Line, DestMax != 0);
+	/*
+	 * EDK2 would use RSIZE_MAX, but we use the smaller PATH_MAX for
+	 * gnu-efi as it can help detect path overflows while debugging.
+	 */
+	P_ASSERT(File, Line, DestMax <= PATH_MAX);
+	P_ASSERT(File, Line, DestMax > StrLen(Source) + StrLen(Destination));
+	Destination += StrLen(Destination);
+	while (*Source != 0)
+		*(Destination++) = *(Source++);
+	*Destination = 0;
+#else
+	P_ASSERT(File, Line, StrCatS(Destination, DestMax, Source) == 0);
+#endif
+}
+
+#define SafeStrCat(d, l, s) _SafeStrCat(d, l, s, __FILE__, __LINE__)
+
 /**
   Detect if we are running a test system by querying the SMBIOS vendor string.
 
@@ -461,4 +488,20 @@ VOID InitProgress(
 **/
 VOID UpdateProgress(
 	IN PROGRESS_DATA* Progress
+);
+
+/**
+  Create a " (####.# <suffix>)" static string, e.g. " (133.7 MB)", from a 64-bit
+  size value, that can be appended to a file path so as to report size to the
+  user in an more human readable manner.
+  @param[in]  Size            A 64-bit size.
+
+  @retval     A static string with the human readable size or " (too large)" if
+              the size is larger than 1 PB.
+              The string is static and does not need to be freed. However it is
+              expected that only *one* call is made to this function before the
+              value is printed out and no longer needed.
+**/
+CHAR16* SizeToHumanReadable(
+	CONST IN UINT64 Size
 );

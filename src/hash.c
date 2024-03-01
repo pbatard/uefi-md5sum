@@ -289,6 +289,7 @@ EFI_STATUS HashFile(
 	UINTN Size, ReadSize;
 	UINT64 ReadBytes;
 	UINT8 Buffer[MD5_BUFFERSIZE];
+	CHAR16 DisplayPath[PATH_MAX], *StrSize;
 
 	if ((Root == NULL) || (Path == NULL) || (Hash == NULL))
 		goto out;
@@ -315,6 +316,19 @@ EFI_STATUS HashFile(
 		Status = EFI_INVALID_PARAMETER;
 		goto out;
 	}
+
+	// Print the file we are currently processing, along with its size
+	V_ASSERT(ARRAY_SIZE(DisplayPath) > Console.Cols);
+	StrSize = SizeToHumanReadable(Info->FileSize);
+	// We could do without this assert since StrSize is at most 32 and
+	// Console.Cols at least COLS_MIN (>32) but in case someone worries...
+	V_ASSERT(Console.Cols > SafeStrLen(StrSize) - 1);
+	SafeStrCpy(DisplayPath, ARRAY_SIZE(DisplayPath), Path);
+	// The following unconditionally truncates the path to what's needed
+	// to append the size in case it's too long to fit on one line.
+	DisplayPath[Console.Cols - SafeStrLen(StrSize) - 1] = 0;
+	SafeStrCat(DisplayPath, ARRAY_SIZE(DisplayPath), StrSize);
+	PrintCentered(DisplayPath, Console.Rows / 2 - 1);
 
 	// Compute the MD5 Hash
 	Md5Init(&Context);

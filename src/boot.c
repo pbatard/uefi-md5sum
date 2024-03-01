@@ -154,6 +154,47 @@ out:
 }
 
 /**
+  Create a " (####.# <suffix>)" static string, e.g. " (133.7 MB)", from a 64-bit
+  size value, that can be appended to a file path so as to report size to the
+  user in an more human readable manner.
+  @param[in]  Size            A 64-bit size.
+
+  @retval     A static string with the human readable size or " (too large)" if
+              the size is larger than 1 PB.
+              The string is static and does not need to be freed. However it is
+              expected that only *one* call is made to this function before the
+              value is printed out and no longer needed.
+**/
+CHAR16* SizeToHumanReadable(
+	CONST IN UINT64 Size
+)
+{
+	STATIC CONST CHAR16* StrSufix[] = { L"bytes", L"KB", L"MB", L"GB", L"TB" };
+	STATIC CHAR16 StrSize[32];
+	INTN Suffix;
+	UINT64 HrSize;
+
+	// Size must be less than 1024 TB (1 PB)
+	if (Size >= 1125899906842624ULL)
+		return L" (too large)";
+
+	// NB: (1 PB - 1) * 100 still won't overflow a 64-bit value
+	HrSize = Size * 100ULL;
+
+	for (Suffix = 0; Suffix < ARRAY_SIZE(StrSufix) - 1; Suffix++) {
+		if (HrSize < 1024ULL * 100ULL)
+			break;
+		HrSize /= 1024ULL;
+	}
+
+	if (Suffix == 0 || (HrSize - (HrSize / 10ULL) * 10ULL) < 5ULL)
+		UnicodeSPrint(StrSize, ARRAY_SIZE(StrSize), L" (%lld %s)", HrSize / 100ULL, StrSufix[Suffix]);
+	else
+		UnicodeSPrint(StrSize, ARRAY_SIZE(StrSize), L" (%lld.%lld %s)", HrSize / 100ULL, HrSize / 10ULL - (HrSize / 100ULL) * 10ULL, StrSufix[Suffix]);
+	return StrSize;
+}
+
+/**
   Process exit according to the multiple scenarios we want to handle
   (Chain load the next bootloader, shutdown if test mode, etc.).
 
