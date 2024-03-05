@@ -95,14 +95,14 @@ extern UINTN                AlertYPos;
 /* Block size used for MD5 hash computation */
 #define MD5_BLOCKSIZE       64
 
-/* Buffer size used for MD5 hashing */
-#define MD5_BUFFERSIZE      65536
-
-/* Number of MD5 buffers to process for each MB of data */
-#define MD5_PROCESSED_1MB   ((1024 * 1024) / MD5_BUFFERSIZE)
-
 /* Size of the hexascii representation of a hash */
 #define HASH_HEXASCII_SIZE  (MD5_HASHSIZE * 2)
+
+/* Buffer size for file reads and MD5 hashing */
+#define READ_BUFFERSIZE     (1024 * 1024)
+
+/* Number of bytes to process between watchdog resets */
+#define WATCHDOG_RESETSIZE  (128 * 1024 * 1024)
 
 /* Maximum size to be used for paths */
 #ifndef PATH_MAX

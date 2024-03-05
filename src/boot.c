@@ -75,7 +75,7 @@ STATIC EFI_STATUS GetRootHandle(
 	// Open the the root directory on the boot volume
 	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle,
 		&gEfiSimpleFileSystemProtocolGuid, (VOID**)&Volume,
-		MainImageHandle, NULL, EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+		MainImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(Status))
 		return Status;
 
@@ -321,6 +321,7 @@ EFI_STATUS EFIAPI efi_main(
 	Status = Parse(Root, HASH_FILE, &HashList);
 	if (EFI_ERROR(Status))
 		goto out;
+	V_ASSERT(HashList.Entry != NULL);
 
 	// Print any extra data we want to validate
 	PrintTest(L"TotalBytes = 0x%lX", HashList.TotalBytes);
@@ -328,12 +329,12 @@ EFI_STATUS EFIAPI efi_main(
 	// Set up the progress bar data
 	Progress.Type = (HashList.TotalBytes == 0) ? PROGRESS_TYPE_FILE : PROGRESS_TYPE_BYTE;
 	Progress.Maximum = (HashList.TotalBytes == 0) ? HashList.NumEntries : HashList.TotalBytes;
-	Progress.Message = L"Media verification";
+	Progress.Message = L"Media validation";
 	Progress.YPos = Console.Rows / 2 - 3;
 	InitProgress(&Progress);
 	SetText(TEXT_YELLOW);
 	if (!IsTestMode)
-		PrintCentered(L"[Press any key to skip]", Console.Rows - 2);
+		PrintCentered(L"[Press any key to cancel]", Console.Rows - 2);
 	DefText();
 
 	// Now go through each entry we parsed

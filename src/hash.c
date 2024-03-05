@@ -280,7 +280,6 @@ EFI_STATUS HashFile(
 	OUT UINT8* Hash
 )
 {
-	STATIC UINTN BlocksProcessed = 0;
 	STATIC UINTN LastWatchDogReset = 0;
 	EFI_STATUS Status = EFI_INVALID_PARAMETER;
 	EFI_FILE_HANDLE File = NULL;
@@ -288,11 +287,17 @@ EFI_STATUS HashFile(
 	HASH_CONTEXT Context = { 0 };
 	UINTN Size, ReadSize;
 	UINT64 ReadBytes;
-	UINT8 Buffer[MD5_BUFFERSIZE];
+	UINT8* Buffer = NULL;
 	CHAR16 DisplayPath[PATH_MAX], *StrSize;
 
 	if ((Root == NULL) || (Path == NULL) || (Hash == NULL))
 		goto out;
+
+	Buffer = AllocatePool(READ_BUFFERSIZE);
+	if (Buffer == NULL) {
+		Status = EFI_OUT_OF_RESOURCES;
+		goto out;
+	}
 
 	ZeroMem(Hash, MD5_HASHSIZE);
 
@@ -339,23 +344,22 @@ EFI_STATUS HashFile(
 			goto out;
 		if (ReadSize == 0)
 			break;
-		// Update the progress data (if byte type)
-		if (Progress != NULL && Progress->Type == PROGRESS_TYPE_BYTE)
-			Progress->Current += ReadSize;
 		Md5Write(&Context, Buffer, ReadSize);
-		// Check for user cancel and report progress for each MB of data
-		if (BlocksProcessed++ % MD5_PROCESSED_1MB == 0) {
+		// Update the progress data (if byte type)
+		if (Progress != NULL && Progress->Type == PROGRESS_TYPE_BYTE) {
+			Progress->Current += ReadSize;
 			UpdateProgress(Progress);
-			// We need to set the watchdog timer regularly or else the UEFI firmware
-			// considers the bootloader stalled and resets the system. Do it for every
-			// 128 MB processed, as, with a default watchdog period of 5 mins, even
-			// very slow systems should be fine...
-			if (LastWatchDogReset++ % 128 == 0)
-				gBS->SetWatchdogTimer(300, 0x11D5, 0, NULL);
-			if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY) {
-				Status = EFI_ABORTED;
-				goto out;
-			}
+		}
+		// The watchdog timer must be set regularly, otherwise the UEFI firmware
+		// considers the bootloader stalled and resets the system. Do this every
+		// WATCHDOG_RESETSIZE bytes processed, as, with a default watchdog period
+		// of 5 mins (per UEFI specs), it should accomodate even very slow systems.
+		if (LastWatchDogReset++ % (WATCHDOG_RESETSIZE / READ_BUFFERSIZE) == 0)
+			gBS->SetWatchdogTimer(300, 0x11D5, 0, NULL);
+		// Check for user cancel (keypress)
+		if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY) {
+			Status = EFI_ABORTED;
+			goto out;
 		}
 	}
 	// Report an error if we did not read the expected amount of data
@@ -373,6 +377,7 @@ EFI_STATUS HashFile(
 	Status = EFI_SUCCESS;
 
 out:
+	SafeFree(Buffer);
 	if (File != NULL)
 		File->Close(File);
 	SafeFree(Info);
