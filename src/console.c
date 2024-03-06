@@ -27,6 +27,15 @@ UINTN AlertYPos = ROWS_MIN / 2 + 1;
 /* String used to erase a single line on the console */
 STATIC CHAR16 EmptyLine[STRING_MAX] = { 0 };
 
+/* Structure used for scrolling messages */
+STATIC struct {
+	CHAR16* Section;
+	UINTN Index;
+	UINTN Lines;
+	UINTN YPos;
+	UINTN MaxLines;
+} Scroll = { 0 };
+
 /**
   Console initialisation.
 **/
@@ -49,7 +58,7 @@ VOID InitConsole(VOID)
 	}
 	if (Console.Cols >= PATH_MAX)
 		Console.Cols = PATH_MAX - 1;
-	AlertYPos = Console.Rows / 2 + 1;
+	AlertYPos = 2;
 
 	// Populate a blank line we can use to erase a line
 	for (i = 0; i < Console.Cols; i++)
@@ -86,39 +95,127 @@ VOID PrintCentered(
 }
 
 /**
+  Initialize a scrolling section on the console.
+
+  @param[in]   YPos              The vertical start position of the scrolling section.
+  @param[in]   NumberOfLines     How many lines should the scrolling section have.
+
+  @retval EFI_SUCCESS            The scroll section was successfully initialized.
+  @retval EFI_INVALID_PARAMETER  The provided parameters are invalid.
+  @retval EFI_OUT_OF_RESOURCES   A memory allocation error occurred.
+**/
+EFI_STATUS InitScrollSection(
+	CONST UINTN YPos,
+	CONST UINTN NumberOfLines
+)
+{
+	EFI_STATUS Status = EFI_SUCCESS;
+
+	V_ASSERT(Console.Rows > 8);
+	if (NumberOfLines < 2 || NumberOfLines + YPos >= Console.Rows)
+		return EFI_INVALID_PARAMETER;
+
+	// Set up the console real estate for scrolling messages
+	ZeroMem(&Scroll, sizeof(Scroll));
+	// Default position where the scroll section starts
+	Scroll.YPos = YPos;
+	// Maximum number of lines we display/scroll
+	Scroll.MaxLines = NumberOfLines;
+	Scroll.Section = AllocateZeroPool(Scroll.MaxLines * (Console.Cols + 1) * sizeof(CHAR16));
+	if (Scroll.Section == NULL)
+		Status = EFI_OUT_OF_RESOURCES;
+	return Status;
+}
+
+/**
+  Scroll section teardown.
+**/
+VOID ExitScrollSection(VOID)
+{
+	SafeFree(Scroll.Section);
+}
+
+/**
   Print a hash entry that has failed processing.
   Do this over a specific section of the console we cycle over.
 
   @param[in]  Status     The Status code from the failed operation on the entry.
   @param[in]  Path       A pointer to the CHAR16 string with the Path of the entry.
-  @param[in]  NumFailed  The current number of failed entries.
 **/
 VOID PrintFailedEntry(
 	IN CONST EFI_STATUS Status,
-	IN CHAR16* Path,
-	IN CONST UINTN NumFailed
+	IN CONST CHAR16* Path
 )
 {
-	if (!EFI_ERROR(Status) || Path == NULL)
+	CHAR16 ErrorMsg[128], *Src, *Line;
+	UINTN Index;
+
+	if (!EFI_ERROR(Status) || Path == NULL || Scroll.Section == NULL ||
+		(Scroll.YPos + Scroll.MaxLines >= Console.Rows))
 		return;
 
-	// Truncate the path in case it's very long.
-	if (SafeStrLen(Path) > 80)
-		Path[80] = L'\0';
-	if (!IsTestMode) {
-		// Clear any existing text on this line
-		SetTextPosition(0, 1 + (NumFailed % (Console.Rows / 2 - 4)));
-		gST->ConOut->OutputString(gST->ConOut, EmptyLine);
-	}
-	SetTextPosition(MARGIN_H, 1 + (NumFailed % (Console.Rows / 2 - 4)));
-	SetText(TEXT_RED);
-	Print(L"[FAIL]");
-	DefText();
 	// Display a more explicit message (than "CRC Error") for files that fail MD5
 	if (Status == EFI_CRC_ERROR)
-		Print(L" File '%s': [27] MD5 Checksum Error\n", Path);
+		UnicodeSPrint(ErrorMsg, ARRAY_SIZE(ErrorMsg), L": [27] Checksum Error");
 	else
-		Print(L" File '%s': [%d] %r\n", Path, (Status & 0x7FFFFFFF), Status);
+		UnicodeSPrint(ErrorMsg, ARRAY_SIZE(ErrorMsg), L": [%d] %r", (Status & 0x7FFFFFFF), Status);
+	if (IsTestMode)
+		SafeStrCat(ErrorMsg, ARRAY_SIZE(ErrorMsg), L"\r\n");
+
+	// Fill a new line in our scroll section
+	V_ASSERT(Scroll.Index < Scroll.MaxLines);
+	Line = &Scroll.Section[Scroll.Index * (Console.Cols + 1)];
+
+	// Copy as much of the Path as we have space available before the error message
+	V_ASSERT(StrLen(ErrorMsg) < Console.Cols);
+	for (Index = 0; (Path[Index] != 0) && (Index < Console.Cols - StrLen(ErrorMsg)); Index++)
+		Line[Index] = Path[Index];
+
+	// Add a truncation mark to the path if it was too long (but longer than 16 characters)
+	if (Path[Index] != 0 && Index > 16) {
+		Line[Index - 3] = L'.';
+		Line[Index - 2] = L'.';
+		Line[Index - 1] = L'.';
+	}
+
+	// Append the error message (since we made sure that we had enough space)
+	Src = ErrorMsg;
+	while (*Src != 0)
+		Line[Index++] = *Src++;
+
+	// Fill the remainder of the line with spaces and terminate it
+	V_ASSERT(Index <= Console.Cols);
+	if (!IsTestMode) {
+		while (Index < Console.Cols)
+			Line[Index++] = L' ';
+	}
+	Line[Index] = 0;
+	// Be paranoid about string overflow
+	V_ASSERT(Line[Console.Cols] == 0);
+
+	if (Scroll.Lines < Scroll.MaxLines) {
+		// We haven't reached scroll capacity yet, so just output the new
+		// line after the last.
+		Scroll.Lines++;
+		SetTextPosition(0, Scroll.YPos + Scroll.Index);
+		gST->ConOut->OutputString(gST->ConOut, Line);
+	} else {
+		// We have reached scroll capacity, so we reprint all the lines at
+		// their new position.
+		SetTextPosition(0, Scroll.YPos);
+		V_ASSERT(Scroll.Index < Scroll.MaxLines);
+		// Start reprinting after the the line we just updated (i.e. from the
+		// line at Scroll.Index + 1) and make sure to apply Scroll.MaxLines
+		// as the modulo.
+		for (Index = Scroll.Index + 1; Index <= Scroll.Index + Scroll.MaxLines; Index++) {
+			Line = &Scroll.Section[(Index % Scroll.MaxLines) * (Console.Cols + 1)];
+			// Be paranoid about array overflow
+			V_ASSERT((UINTN)Line + (Console.Cols + 1) * sizeof(CHAR16) <=
+				(UINTN)Scroll.Section + Scroll.MaxLines * (Console.Cols + 1) * sizeof(CHAR16));
+			gST->ConOut->OutputString(gST->ConOut, Line);
+		}
+	}
+	Scroll.Index = (Scroll.Index + 1) % Scroll.MaxLines;
 }
 
 /**
@@ -138,14 +235,12 @@ VOID InitProgress(
 		Console.Cols >= STRING_MAX || Progress->Message == NULL)
 		return;
 
-	if (SafeStrLen(Progress->Message) > Console.Cols - MARGIN_H * 2 - 8)
-		return;
-
 	if (Progress->YPos > Console.Rows - 3)
 		Progress->YPos = Console.Rows - 3;
 
+	if ((SafeStrLen(Progress->Message) + 6) / 2 > Console.Cols / 2)
+		return;
 	MessagePos = Console.Cols / 2 - (SafeStrLen(Progress->Message) + 6) / 2;
-	V_ASSERT(MessagePos > MARGIN_H);
 
 	Progress->Current = 0;
 	Progress->LastCol = 0;
@@ -155,8 +250,8 @@ VOID InitProgress(
 		SetTextPosition(MessagePos, Progress->YPos);
 		Print(L"%s: 0.0%%", Progress->Message);
 
-		SetTextPosition(MARGIN_H, Progress->YPos + 1);
-		for (i = 0; i < Console.Cols - MARGIN_H * 2; i++)
+		SetTextPosition(0, Progress->YPos + 1);
+		for (i = 0; i < Console.Cols; i++)
 			Print(L"░");
 	}
 
@@ -189,10 +284,10 @@ VOID UpdateProgress(
 	}
 
 	// Update the progress bar
-	CurCol = (UINTN)((Progress->Current * (Console.Cols - MARGIN_H * 2)) / Progress->Maximum);
+	CurCol = (UINTN)((Progress->Current * Console.Cols) / Progress->Maximum);
 	if (!IsTestMode) {
 		for (; CurCol > Progress->LastCol && Progress->LastCol < Console.Cols; Progress->LastCol++) {
-			SetTextPosition(MARGIN_H + Progress->LastCol, Progress->YPos + 1);
+			SetTextPosition(Progress->LastCol, Progress->YPos + 1);
 			Print(L"%c", BLOCKELEMENT_FULL_BLOCK);
 		}
 	}
@@ -215,9 +310,9 @@ VOID CountDown(
 	UINTN MessagePos, CounterPos;
 	INTN i;
 
+	V_ASSERT(Console.Cols / 2 > SafeStrLen(Message) / 2 - 1);
 	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2 - 1;
 	CounterPos = MessagePos + SafeStrLen(Message) + 2;
-	V_ASSERT(MessagePos > MARGIN_H);
 
 	if (IsTestMode)
 		return;

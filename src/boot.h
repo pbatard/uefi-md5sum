@@ -86,9 +86,6 @@ extern UINTN                AlertYPos;
 #define COLS_MIN            50
 #define ROWS_MIN            20
 
-/* Horizontal margins used for the console output */
-#define MARGIN_H            2
-
 /* Size of an MD5 hash */
 #define MD5_HASHSIZE        16
 
@@ -187,13 +184,13 @@ typedef struct {
 /*
  * Convenience macros to print informational, warning or error messages.
  */
-#define PrintInfo(fmt, ...)     do { SetTextPosition(MARGIN_H, AlertYPos++); \
+#define PrintInfo(fmt, ...)     do { SetTextPosition(0, AlertYPos++); \
                                      SetText(TEXT_WHITE); Print(L"[INFO]"); DefText(); \
                                      Print(L" " fmt L"\n", ##__VA_ARGS__); } while(0)
-#define PrintWarning(fmt, ...)  do { SetTextPosition(MARGIN_H, AlertYPos++); \
+#define PrintWarning(fmt, ...)  do { SetTextPosition(0, AlertYPos++); \
                                      SetText(TEXT_YELLOW); Print(L"[WARN]"); DefText(); \
                                      Print(L" " fmt L"\n", ##__VA_ARGS__); } while(0)
-#define PrintError(fmt, ...)    do { SetTextPosition(MARGIN_H, AlertYPos++); \
+#define PrintError(fmt, ...)    do { SetTextPosition(0, AlertYPos++); \
                                      SetText(TEXT_RED); Print(L"[FAIL]"); DefText(); \
                                      Print(L" " fmt L": [%d] %r\n", ##__VA_ARGS__, (Status&0x7FFFFFFF), Status); } while (0)
 #define PrintTest(fmt, ...)     do { if (IsTestMode) Print(L"[TEST] " fmt L"\n", ##__VA_ARGS__); } while(0)
@@ -202,7 +199,7 @@ typedef struct {
 #define SetTextPosition(x, y)   do { if (!IsTestMode) gST->ConOut->SetCursorPosition(gST->ConOut, x, y);} while (0)
 
 /* Convenience assertion macro */
-#define P_ASSERT(f, l, a)   do { if(!(a)) { Print(L"*** ASSERT FAILED: %a(%d): %a ***\n", f, l, #a); \
+#define P_ASSERT(f, l, a)   do { if(!(a)) { Print(L"\n*** ASSERT FAILED: %a(%d): %a ***\n", f, l, #a); \
                                           if (IsTestMode) ShutDown(); else Halt(); } } while(0)
 #define V_ASSERT(a)         P_ASSERT(__FILE__, __LINE__, a)
 
@@ -437,6 +434,26 @@ EFI_STATUS Utf8ToUcs2(
 VOID InitConsole(VOID);
 
 /**
+  Initialize a scrolling section on the console.
+
+  @param[in]   YPos              The vertical start position of the scrolling section.
+  @param[in]   NumberOfLines     How many lines should the scrolling section have.
+
+  @retval EFI_SUCCESS            The scroll section was successfully initialized.
+  @retval EFI_INVALID_PARAMETER  The provided parameters are invalid.
+  @retval EFI_OUT_OF_RESOURCES   A memory allocation error occurred.
+**/
+EFI_STATUS InitScrollSection(
+	CONST UINTN YPos,
+	CONST UINTN NumberOfLines
+);
+
+/**
+  Scroll section teardown.
+**/
+VOID ExitScrollSection(VOID);
+
+/**
   Print a centered message on the console.
 
   @param[in]  Message    The text message to print.
@@ -457,8 +474,7 @@ VOID PrintCentered(
 **/
 VOID PrintFailedEntry(
 	IN CONST EFI_STATUS Status,
-	IN CHAR16* Path,
-	IN CONST UINTN NumFailed
+	IN CONST CHAR16* Path
 );
 
 /**

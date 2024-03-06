@@ -242,7 +242,7 @@ STATIC EFI_STATUS ExitProcess(
 			Status = gBS->StartImage(ImageHandle, NULL, NULL);
 		}
 		if (EFI_ERROR(Status)) {
-			SetTextPosition(MARGIN_H, Console.Rows / 2 + 1);
+			SetTextPosition(0, Console.Rows / 2 + 1);
 			PrintError(L"Could not launch original bootloader");
 		}
 	}
@@ -304,7 +304,7 @@ EFI_STATUS EFIAPI efi_main(
 
 	Status = GetRootHandle(&DeviceHandle, &Root);
 	if (EFI_ERROR(Status)) {
-		PrintError(L"Could not open root directory\n");
+		PrintError(L"Could not open root directory");
 		goto out;
 	}
 
@@ -336,6 +336,13 @@ EFI_STATUS EFIAPI efi_main(
 	if (!IsTestMode)
 		PrintCentered(L"[Press any key to cancel]", Console.Rows - 2);
 	DefText();
+
+	// Set up the scroll section where we display individual file validation errors
+	Status = InitScrollSection(Console.Rows / 2 + 1, Console.Rows / 2 - 4);
+	if (EFI_ERROR(Status)) {
+		PrintError(L"Could not set up scroll section");
+		goto out;
+	}
 
 	// Now go through each entry we parsed
 	for (Index = 0; Index < HashList.NumEntries; Index++) {
@@ -375,16 +382,17 @@ EFI_STATUS EFIAPI efi_main(
 			break;
 
 		// Report failures
-		if (EFI_ERROR(Status))
-			PrintFailedEntry(Status, Path, NumFailed++);
+		if (EFI_ERROR(Status)) {
+			NumFailed++;
+			PrintFailedEntry(Status, Path);
+		}
 	}
 
+	ExitScrollSection();
+
 	// Final report
-	UnicodeSPrint(Message, ARRAY_SIZE(Message), L"%d/%d file%s processed",
-		Index, HashList.NumEntries, (HashList.NumEntries == 1) ? L"" : L"s");
-	V_ASSERT(SafeStrLen(Message) < ARRAY_SIZE(Message) / 2);
-	UnicodeSPrint(&Message[SafeStrLen(Message)], ARRAY_SIZE(Message) - SafeStrLen(Message),
-		L" [%d failed]", NumFailed);
+	UnicodeSPrint(Message, ARRAY_SIZE(Message), L"%d/%d file%s processed [%d failed]",
+		Index, HashList.NumEntries, (HashList.NumEntries == 1) ? L"" : L"s", NumFailed);
 	PrintCentered(Message, Progress.YPos + 2);
 
 out:

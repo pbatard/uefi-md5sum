@@ -13,7 +13,7 @@
 
 # Hash list min size
 > echo -n "00112233445566778899aabbccddeeff f" > image/md5sum.txt
-[FAIL] File 'f': [14] Not Found
+f: [14] Not Found
 1/1 file processed [1 failed]
 
 # Hash list too large
@@ -50,7 +50,7 @@
 
 # Hash containing uppercase
 > echo "00112233445566778899AaBbCcDdEeFf Mixed case hash" > image/md5sum.txt
-[FAIL] File 'Mixed case hash': [14] Not Found
+Mixed case hash: [14] Not Found
 1/1 file processed [1 failed]
 
 # Path containing NUL
@@ -69,19 +69,19 @@
 # Max Path size
 > filename=$(cat /dev/zero | tr '\0' 'a' | head -c 512)
 > echo -n "00112233445566778899aabbccddeeff $filename" > image/md5sum.txt
-[FAIL] File 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa': [2] Invalid Parameter
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...: [2] Invalid Parameter
 1/1 file processed [1 failed]
 
 # Comment preceded by whitespaces
 > echo " 	# Comment preceded by whitespaces" > image/md5sum.txt
 > echo "0123456789abcdef0123456789abcdef file" >> image/md5sum.txt
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # Comment followed by whitespaces
 > echo "# Comment followed by whitespaces 	" > image/md5sum.txt
 > echo "0123456789abcdef0123456789abcdef file1" >> image/md5sum.txt
-[FAIL] File 'file1': [14] Not Found
+file1: [14] Not Found
 1/1 file processed [1 failed]
 
 # Comment containing a NUL
@@ -94,15 +94,15 @@
 > echo "00112233445566778899aabbccddeeff file1" > image/md5sum.txt
 > echo "# Comment in the middle" >> image/md5sum.txt
 > echo "0123456789abcdef0123456789abcdef file2" >> image/md5sum.txt
-[FAIL] File 'file1': [14] Not Found
-[FAIL] File 'file2': [14] Not Found
+file1: [14] Not Found
+file2: [14] Not Found
 2/2 files processed [2 failed]
 
 # Unterminated hash list
 > echo "00112233445566778899aabbccddeeff file1" > image/md5sum.txt
 > echo -n "0123456789abcdef0123456789abcdef file2" >> image/md5sum.txt
-[FAIL] File 'file1': [14] Not Found
-[FAIL] File 'file2': [14] Not Found
+file1: [14] Not Found
+file2: [14] Not Found
 2/2 files processed [2 failed]
 
 # Empty path
@@ -115,7 +115,7 @@
 > echo "# md5sum_totalbytes =" >> image/md5sum.txt
 [WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # Invalid TotalBytes
@@ -123,7 +123,7 @@
 > echo "# md5sum_totalbytes = invalid" >> image/md5sum.txt
 [WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes invalid 0x prefix
@@ -131,7 +131,7 @@
 > echo "# md5sum_totalbytes = 0 x1234" >> image/md5sum.txt
 [WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes missing 0x prefix
@@ -139,21 +139,21 @@
 > echo "# md5sum_totalbytes = 1234" >> image/md5sum.txt
 [WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes 1 character value
 > echo "# md5sum_totalbytes = 0x8  " > image/md5sum.txt
 > echo "00112233445566778899aabbccddeeff file" >> image/md5sum.txt
 [TEST] TotalBytes = 0x8
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes 16 characters value
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "#md5sum_totalbytes = 0x12345678abcdef0" >> image/md5sum.txt
 [TEST] TotalBytes = 0x12345678ABCDEF0
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes 17 characters value
@@ -161,21 +161,21 @@
 > echo "# md5sum_totalbytes =    0xabcdabcdabcdabcd0   " >> image/md5sum.txt
 [WARN] Ignoring invalid md5sum_totalbytes value
 [TEST] TotalBytes = 0x0
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes no spaces
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "#md5sum_totalbytes=0x1234abcd" >> image/md5sum.txt
 [TEST] TotalBytes = 0x1234ABCD
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # TotalBytes multiple spaces
 > echo "00112233445566778899aabbccddeeff file" > image/md5sum.txt
 > echo "#   md5sum_totalbytes    =    0x1234abcd" >> image/md5sum.txt
 [TEST] TotalBytes = 0x1234ABCD
-[FAIL] File 'file': [14] Not Found
+file: [14] Not Found
 1/1 file processed [1 failed]
 
 # MD5 basic validation for up to 2-blocks
@@ -189,23 +189,23 @@
 
 # MD5 dot directory
 > echo "00112233445566778899aabbccddeeff ." > image/md5sum.txt
-[FAIL] File '.': [2] Invalid Parameter
+.: [2] Invalid Parameter
 1/1 file processed [1 failed]
 
 # MD5 multiple dot directories
 > echo "00112233445566778899aabbccddeeff ././." > image/md5sum.txt
-[FAIL] File '.\.\.': [2] Invalid Parameter
+.\.\.: [2] Invalid Parameter
 1/1 file processed [1 failed]
 
 # MD5 parent directory
 > echo "00112233445566778899aabbccddeeff .." > image/md5sum.txt
-[FAIL] File '..': [2] Invalid Parameter
+..: [2] Invalid Parameter
 1/1 file processed [1 failed]
 
 # MD5 subdirectory
 > mkdir image/dir
 > echo "00112233445566778899aabbccddeeff dir" > image/md5sum.txt
-[FAIL] File 'dir': [2] Invalid Parameter
+dir: [2] Invalid Parameter
 1/1 file processed [1 failed]
 
 # MD5 files in subdirectories (with spaces)
@@ -233,22 +233,22 @@
 # MD5 bit flip in data
 > echo "This is b test" > image/file
 > echo "ff22941336956098ae9a564289d1bf1b  file" > image/md5sum.txt
-[FAIL] File 'file': [27] MD5 Checksum Error
+file: [27] Checksum Error
 1/1 file processed [1 failed]
 < rm image/file*
 
 # MD5 bit flip in hash
 > echo "This is a test" > image/file
 > echo "ef22941336956098ae9a564289d1bf1b  file" > image/md5sum.txt
-[FAIL] File 'file': [27] MD5 Checksum Error
+file: [27] Checksum Error
 1/1 file processed [1 failed]
 < rm image/file*
 
 # UTF-8 invalid sequences
 > echo -e '00112233445566778899aabbccddeeff inv\x80alid' > image/md5sum.txt
 > echo -e '00112233445566778899aabbccddeeff \xff\xff\xff\xff' >> image/md5sum.txt
-[FAIL] File 'inv?alid': [2] Invalid Parameter
-[FAIL] File '????': [2] Invalid Parameter
+inv?alid: [2] Invalid Parameter
+????: [2] Invalid Parameter
 2/2 files processed [2 failed]
 
 # UTF-8 complex sequences (with spaces)
