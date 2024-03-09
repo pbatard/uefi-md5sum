@@ -338,7 +338,7 @@ EFI_STATUS HashFile(
 	// Compute the MD5 Hash
 	Md5Init(&Context);
 	for (ReadBytes = 0; ; ReadBytes += ReadSize) {
-		ReadSize = sizeof(Buffer);
+		ReadSize = READ_BUFFERSIZE;
 		Status = File->Read(File, &ReadSize, Buffer);
 		if (EFI_ERROR(Status))
 			goto out;

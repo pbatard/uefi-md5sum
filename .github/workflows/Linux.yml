@@ -70,3 +70,10 @@ jobs:
       with:
         name: ${{ matrix.TARGET_TYPE }}
         path: ./*.efi
+
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        files: ./*.efi
