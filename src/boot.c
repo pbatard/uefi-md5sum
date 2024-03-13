@@ -18,15 +18,15 @@
 
 #include "boot.h"
 
+/* Copy of the main Image Handle */
+EFI_HANDLE gMainImageHandle = NULL;
+
 /*
  * When performing tests with GitHub Actions, we want to remove all
  * colour formatting as well force shutdown on exit (to exit qemu)
  * so we need a variable to tell us if we are running in test mode.
  */
-BOOLEAN IsTestMode = FALSE;
-
-/* Copy of the main Image Handle */
-STATIC EFI_HANDLE MainImageHandle = NULL;
+BOOLEAN gIsTestMode = FALSE;
 
 /* Strings used for platform identification */
 #if defined(_M_X64) || defined(__x86_64__)
@@ -65,8 +65,8 @@ STATIC EFI_STATUS GetRootHandle(
 		return EFI_INVALID_PARAMETER;
 
 	// Access the loaded image so we can open the current volume
-	Status = gBS->OpenProtocol(MainImageHandle, &gEfiLoadedImageProtocolGuid,
-		(VOID**)&LoadedImage, MainImageHandle,
+	Status = gBS->OpenProtocol(gMainImageHandle, &gEfiLoadedImageProtocolGuid,
+		(VOID**)&LoadedImage, gMainImageHandle,
 		NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(Status))
 		return Status;
@@ -75,7 +75,7 @@ STATIC EFI_STATUS GetRootHandle(
 	// Open the the root directory on the boot volume
 	Status = gBS->OpenProtocol(LoadedImage->DeviceHandle,
 		&gEfiSimpleFileSystemProtocolGuid, (VOID**)&Volume,
-		MainImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+		gMainImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(Status))
 		return Status;
 
@@ -213,14 +213,14 @@ STATIC EFI_STATUS ExitProcess(
 
 	// If we have a bootloader to chain load, try to launch it
 	if (DevicePath != NULL) {
-		if (EFI_ERROR(Status) && Status != EFI_ABORTED && !IsTestMode) {
+		if (EFI_ERROR(Status) && Status != EFI_ABORTED && !gIsTestMode) {
 			// Ask the user if they want to continue, unless md5sum.txt could
 			// not be found, in which case continue boot right away.
 			if (Status != EFI_NOT_FOUND) {
 				SetText(TEXT_YELLOW);
 				// Give the user 1 hour to answer the question
 				gBS->SetWatchdogTimer(3600, 0x11D5, 0, NULL);
-				PrintCentered(L"Continue with boot? [y/N]", Console.Rows - 2);
+				PrintCentered(L"Continue with boot? [y/N]", gConsole.Rows - 2);
 				gST->ConIn->Reset(gST->ConIn, FALSE);
 				while (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) == EFI_NOT_READY);
 				if (Key.UnicodeChar != L'y' && Key.UnicodeChar != L'Y') {
@@ -232,23 +232,23 @@ STATIC EFI_STATUS ExitProcess(
 		}
 		// Reset the watchdog to the default 5 minutes timeout and system code
 		gBS->SetWatchdogTimer(300, 0, 0, NULL);
-		Status = gBS->LoadImage(FALSE, MainImageHandle, DevicePath, NULL, 0, &ImageHandle);
+		Status = gBS->LoadImage(FALSE, gMainImageHandle, DevicePath, NULL, 0, &ImageHandle);
 		SafeFree(DevicePath);
 		if (Status == EFI_SUCCESS) {
 			if (RunCountDown)
 				CountDown(L"Continuing in", 3000);
-			if (!IsTestMode)
+			if (!gIsTestMode)
 				gST->ConOut->ClearScreen(gST->ConOut);
 			Status = gBS->StartImage(ImageHandle, NULL, NULL);
 		}
 		if (EFI_ERROR(Status)) {
-			SetTextPosition(0, Console.Rows / 2 + 1);
+			SetTextPosition(0, gConsole.Rows / 2 + 1);
 			PrintError(L"Could not launch original bootloader");
 		}
 	}
 
 	// If running in test mode, shut down QEMU
-	if (IsTestMode)
+	if (gIsTestMode)
 		ShutDown();
 
 	// Wait for a user keystroke as needed
@@ -256,7 +256,7 @@ STATIC EFI_STATUS ExitProcess(
 	if (EFI_ERROR(Status)) {
 #endif
 		SetText(TEXT_YELLOW);
-		PrintCentered(L"[Press any key to exit]", Console.Rows - 2);
+		PrintCentered(L"[Press any key to exit]", gConsole.Rows - 2);
 		DefText();
 		gST->ConIn->Reset(gST->ConIn, FALSE);
 		gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
@@ -289,7 +289,7 @@ EFI_STATUS EFIAPI efi_main(
 	PROGRESS_DATA Progress = { 0 };
 
 	// Keep a global copy of the bootloader's image handle
-	MainImageHandle = BaseImageHandle;
+	gMainImageHandle = BaseImageHandle;
 
 #if defined(_GNU_EFI)
 	InitializeLib(BaseImageHandle, SystemTable);
@@ -298,7 +298,7 @@ EFI_STATUS EFIAPI efi_main(
 	// Determine if we are running in test mode.
 	// Note that test mode is no less secure than regular mode.
 	// It only produces or removes extra onscreen output.
-	IsTestMode = IsTestSystem();
+	gIsTestMode = IsTestSystem();
 
 	InitConsole();
 
@@ -306,6 +306,14 @@ EFI_STATUS EFIAPI efi_main(
 	if (EFI_ERROR(Status)) {
 		PrintError(L"Could not open root directory");
 		goto out;
+	}
+
+	// Detect if we are booting from an NTFS partition served by the buggy
+	// AMI NTFS driver and alert the user if that is the case.
+	if (!IsProblematicNtfsDriver(DeviceHandle)) {
+		PrintWarning(L"Buggy AMI NTFS driver detected!");
+		PrintWarning(L"This driver may produce unexpected checksum errors.");
+		PrintWarning(L"For details, see https://github.com/pbatard/AmiNtfsBug.");
 	}
 
 	// Look up the original boot loader for chain loading
@@ -330,15 +338,15 @@ EFI_STATUS EFIAPI efi_main(
 	Progress.Type = (HashList.TotalBytes == 0) ? PROGRESS_TYPE_FILE : PROGRESS_TYPE_BYTE;
 	Progress.Maximum = (HashList.TotalBytes == 0) ? HashList.NumEntries : HashList.TotalBytes;
 	Progress.Message = L"Media validation";
-	Progress.YPos = Console.Rows / 2 - 3;
+	Progress.YPos = gConsole.Rows / 2 - 3;
 	InitProgress(&Progress);
 	SetText(TEXT_YELLOW);
-	if (!IsTestMode)
-		PrintCentered(L"[Press any key to cancel]", Console.Rows - 2);
+	if (!gIsTestMode)
+		PrintCentered(L"[Press any key to cancel]", gConsole.Rows - 2);
 	DefText();
 
 	// Set up the scroll section where we display individual file validation errors
-	Status = InitScrollSection(Console.Rows / 2 + 1, Console.Rows / 2 - 4);
+	Status = InitScrollSection(gConsole.Rows / 2 + 1, gConsole.Rows / 2 - 4);
 	if (EFI_ERROR(Status)) {
 		PrintError(L"Could not set up scroll section");
 		goto out;

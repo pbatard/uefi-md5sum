@@ -58,7 +58,7 @@ EFI_STATUS Parse(
 	if (EFI_ERROR(Status)) {
 		// A missing md5sum.txt is not really an error, so don't
 		// report it, unless we're running in test mode.
-		if (Status != EFI_NOT_FOUND || IsTestMode)
+		if (Status != EFI_NOT_FOUND || gIsTestMode)
 			PrintError(L"Unable to open '%s'", Path);
 		goto out;
 	}

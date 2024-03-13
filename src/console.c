@@ -1,5 +1,5 @@
 /*
- * uefi-md5sum: UEFI MD5Sum validator - Console related functions
+ * uefi-md5sum: UEFI MD5Sum validator - gConsole related functions
  * Copyright © 2024 Pete Batard <pete@akeo.ie>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,10 +19,10 @@
 #include "boot.h"
 
 /* Dimensions of the UEFI text console */
-CONSOLE_DIMENSIONS Console = { COLS_MIN, ROWS_MIN };
+CONSOLE_DIMENSIONS gConsole = { COLS_MIN, ROWS_MIN };
 
 /* Incremental vertical position at which we display alert messages */
-UINTN AlertYPos = ROWS_MIN / 2 + 1;
+UINTN gAlertYPos = ROWS_MIN / 2 + 1;
 
 /* String used to erase a single line on the console */
 STATIC CHAR16 EmptyLine[STRING_MAX] = { 0 };
@@ -37,7 +37,7 @@ STATIC struct {
 } Scroll = { 0 };
 
 /**
-  Console initialisation.
+  gConsole initialisation.
 **/
 VOID InitConsole(VOID)
 {
@@ -45,23 +45,23 @@ VOID InitConsole(VOID)
 	UINTN i;
 
 	// Clear the console
-	if (!IsTestMode)
+	if (!gIsTestMode)
 		gST->ConOut->ClearScreen(gST->ConOut);
 
 	// Find the amount of console real-estate we have at out disposal
 	Status = gST->ConOut->QueryMode(gST->ConOut, gST->ConOut->Mode->Mode,
-		&Console.Cols, &Console.Rows);
+		&gConsole.Cols, &gConsole.Rows);
 	if (EFI_ERROR(Status)) {
 		// Couldn't get the console dimensions
-		Console.Cols = COLS_MIN;
-		Console.Rows = ROWS_MIN;
+		gConsole.Cols = COLS_MIN;
+		gConsole.Rows = ROWS_MIN;
 	}
-	if (Console.Cols >= PATH_MAX)
-		Console.Cols = PATH_MAX - 1;
-	AlertYPos = 2;
+	if (gConsole.Cols >= PATH_MAX)
+		gConsole.Cols = PATH_MAX - 1;
+	gAlertYPos = 2;
 
 	// Populate a blank line we can use to erase a line
-	for (i = 0; i < Console.Cols; i++)
+	for (i = 0; i < gConsole.Cols; i++)
 		EmptyLine[i] = L' ';
 	EmptyLine[i] = L'\0';
 
@@ -84,9 +84,9 @@ VOID PrintCentered(
 {
 	UINTN MessagePos;
 
-	MessagePos = (Console.Cols / 2 > SafeStrLen(Message) / 2) ?
-		Console.Cols / 2 - SafeStrLen(Message) / 2 : 0;
-	if (!IsTestMode) {
+	MessagePos = (gConsole.Cols / 2 > SafeStrLen(Message) / 2) ?
+		gConsole.Cols / 2 - SafeStrLen(Message) / 2 : 0;
+	if (!gIsTestMode) {
 		SetTextPosition(0, YPos);
 		Print(EmptyLine);
 		SetTextPosition(MessagePos, YPos);
@@ -111,8 +111,8 @@ EFI_STATUS InitScrollSection(
 {
 	EFI_STATUS Status = EFI_SUCCESS;
 
-	V_ASSERT(Console.Rows > 8);
-	if (NumberOfLines < 2 || NumberOfLines + YPos >= Console.Rows)
+	V_ASSERT(gConsole.Rows > 8);
+	if (NumberOfLines < 2 || NumberOfLines + YPos >= gConsole.Rows)
 		return EFI_INVALID_PARAMETER;
 
 	// Set up the console real estate for scrolling messages
@@ -121,7 +121,7 @@ EFI_STATUS InitScrollSection(
 	Scroll.YPos = YPos;
 	// Maximum number of lines we display/scroll
 	Scroll.MaxLines = NumberOfLines;
-	Scroll.Section = AllocateZeroPool(Scroll.MaxLines * (Console.Cols + 1) * sizeof(CHAR16));
+	Scroll.Section = AllocateZeroPool(Scroll.MaxLines * (gConsole.Cols + 1) * sizeof(CHAR16));
 	if (Scroll.Section == NULL)
 		Status = EFI_OUT_OF_RESOURCES;
 	return Status;
@@ -151,7 +151,7 @@ VOID PrintFailedEntry(
 	UINTN Index;
 
 	if (!EFI_ERROR(Status) || Path == NULL || Scroll.Section == NULL ||
-		(Scroll.YPos + Scroll.MaxLines >= Console.Rows))
+		(Scroll.YPos + Scroll.MaxLines >= gConsole.Rows))
 		return;
 
 	// Display a more explicit message (than "CRC Error") for files that fail MD5
@@ -159,16 +159,16 @@ VOID PrintFailedEntry(
 		UnicodeSPrint(ErrorMsg, ARRAY_SIZE(ErrorMsg), L": [27] Checksum Error");
 	else
 		UnicodeSPrint(ErrorMsg, ARRAY_SIZE(ErrorMsg), L": [%d] %r", (Status & 0x7FFFFFFF), Status);
-	if (IsTestMode)
+	if (gIsTestMode)
 		SafeStrCat(ErrorMsg, ARRAY_SIZE(ErrorMsg), L"\r\n");
 
 	// Fill a new line in our scroll section
 	V_ASSERT(Scroll.Index < Scroll.MaxLines);
-	Line = &Scroll.Section[Scroll.Index * (Console.Cols + 1)];
+	Line = &Scroll.Section[Scroll.Index * (gConsole.Cols + 1)];
 
 	// Copy as much of the Path as we have space available before the error message
-	V_ASSERT(StrLen(ErrorMsg) < Console.Cols);
-	for (Index = 0; (Path[Index] != 0) && (Index < Console.Cols - StrLen(ErrorMsg)); Index++)
+	V_ASSERT(StrLen(ErrorMsg) < gConsole.Cols);
+	for (Index = 0; (Path[Index] != 0) && (Index < gConsole.Cols - StrLen(ErrorMsg)); Index++)
 		Line[Index] = Path[Index];
 
 	// Add a truncation mark to the path if it was too long (but longer than 16 characters)
@@ -184,14 +184,14 @@ VOID PrintFailedEntry(
 		Line[Index++] = *Src++;
 
 	// Fill the remainder of the line with spaces and terminate it
-	V_ASSERT(Index <= Console.Cols);
-	if (!IsTestMode) {
-		while (Index < Console.Cols)
+	V_ASSERT(Index <= gConsole.Cols);
+	if (!gIsTestMode) {
+		while (Index < gConsole.Cols)
 			Line[Index++] = L' ';
 	}
 	Line[Index] = 0;
 	// Be paranoid about string overflow
-	V_ASSERT(Line[Console.Cols] == 0);
+	V_ASSERT(Line[gConsole.Cols] == 0);
 
 	if (Scroll.Lines < Scroll.MaxLines) {
 		// We haven't reached scroll capacity yet, so just output the new
@@ -208,10 +208,10 @@ VOID PrintFailedEntry(
 		// line at Scroll.Index + 1) and make sure to apply Scroll.MaxLines
 		// as the modulo.
 		for (Index = Scroll.Index + 1; Index <= Scroll.Index + Scroll.MaxLines; Index++) {
-			Line = &Scroll.Section[(Index % Scroll.MaxLines) * (Console.Cols + 1)];
+			Line = &Scroll.Section[(Index % Scroll.MaxLines) * (gConsole.Cols + 1)];
 			// Be paranoid about array overflow
-			V_ASSERT((UINTN)Line + (Console.Cols + 1) * sizeof(CHAR16) <=
-				(UINTN)Scroll.Section + Scroll.MaxLines * (Console.Cols + 1) * sizeof(CHAR16));
+			V_ASSERT((UINTN)Line + (gConsole.Cols + 1) * sizeof(CHAR16) <=
+				(UINTN)Scroll.Section + Scroll.MaxLines * (gConsole.Cols + 1) * sizeof(CHAR16));
 			gST->ConOut->OutputString(gST->ConOut, Line);
 		}
 	}
@@ -231,27 +231,27 @@ VOID InitProgress(
 
 	Progress->Active = FALSE;
 
-	if (Console.Cols < COLS_MIN || Console.Rows < ROWS_MIN ||
-		Console.Cols >= STRING_MAX || Progress->Message == NULL)
+	if (gConsole.Cols < COLS_MIN || gConsole.Rows < ROWS_MIN ||
+		gConsole.Cols >= STRING_MAX || Progress->Message == NULL)
 		return;
 
-	if (Progress->YPos > Console.Rows - 3)
-		Progress->YPos = Console.Rows - 3;
+	if (Progress->YPos > gConsole.Rows - 3)
+		Progress->YPos = gConsole.Rows - 3;
 
-	if ((SafeStrLen(Progress->Message) + 6) / 2 > Console.Cols / 2)
+	if ((SafeStrLen(Progress->Message) + 6) / 2 > gConsole.Cols / 2)
 		return;
-	MessagePos = Console.Cols / 2 - (SafeStrLen(Progress->Message) + 6) / 2;
+	MessagePos = gConsole.Cols / 2 - (SafeStrLen(Progress->Message) + 6) / 2;
 
 	Progress->Current = 0;
 	Progress->LastCol = 0;
 	Progress->PPos = MessagePos + SafeStrLen(Progress->Message) + 2;
 
-	if (!IsTestMode) {
+	if (!gIsTestMode) {
 		SetTextPosition(MessagePos, Progress->YPos);
 		Print(L"%s: 0.0%%", Progress->Message);
 
 		SetTextPosition(0, Progress->YPos + 1);
-		for (i = 0; i < Console.Cols; i++)
+		for (i = 0; i < gConsole.Cols; i++)
 			Print(L"░");
 	}
 
@@ -270,7 +270,7 @@ VOID UpdateProgress(
 	UINTN CurCol, PerMille;
 
 	if (Progress == NULL || !Progress->Active || Progress->Maximum == 0 ||
-		Console.Cols < COLS_MIN || Console.Cols >= STRING_MAX)
+		gConsole.Cols < COLS_MIN || gConsole.Cols >= STRING_MAX)
 		return;
 
 	if (Progress->Current > Progress->Maximum)
@@ -278,15 +278,15 @@ VOID UpdateProgress(
 
 	// Update the percentage figure
 	PerMille = (UINTN)((Progress->Current * 1000) / Progress->Maximum);
-	if (!IsTestMode) {
+	if (!gIsTestMode) {
 		SetTextPosition(Progress->PPos, Progress->YPos);
 		Print(L"%d.%d%%", PerMille / 10, PerMille % 10);
 	}
 
 	// Update the progress bar
-	CurCol = (UINTN)((Progress->Current * Console.Cols) / Progress->Maximum);
-	if (!IsTestMode) {
-		for (; CurCol > Progress->LastCol && Progress->LastCol < Console.Cols; Progress->LastCol++) {
+	CurCol = (UINTN)((Progress->Current * gConsole.Cols) / Progress->Maximum);
+	if (!gIsTestMode) {
+		for (; CurCol > Progress->LastCol && Progress->LastCol < gConsole.Cols; Progress->LastCol++) {
 			SetTextPosition(Progress->LastCol, Progress->YPos + 1);
 			Print(L"%c", BLOCKELEMENT_FULL_BLOCK);
 		}
@@ -310,16 +310,16 @@ VOID CountDown(
 	UINTN MessagePos, CounterPos;
 	INTN i;
 
-	V_ASSERT(Console.Cols / 2 > SafeStrLen(Message) / 2 - 1);
-	MessagePos = Console.Cols / 2 - SafeStrLen(Message) / 2 - 1;
+	V_ASSERT(gConsole.Cols / 2 > SafeStrLen(Message) / 2 - 1);
+	MessagePos = gConsole.Cols / 2 - SafeStrLen(Message) / 2 - 1;
 	CounterPos = MessagePos + SafeStrLen(Message) + 2;
 
-	if (IsTestMode)
+	if (gIsTestMode)
 		return;
 
-	SetTextPosition(0, Console.Rows - 2);
+	SetTextPosition(0, gConsole.Rows - 2);
 	Print(EmptyLine);
-	SetTextPosition(MessagePos, Console.Rows - 2);
+	SetTextPosition(MessagePos, gConsole.Rows - 2);
 	SetText(TEXT_YELLOW);
 	Print(L"[%s ", Message);
 
@@ -329,7 +329,7 @@ VOID CountDown(
 		if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY)
 			break;
 		if (i % 1000 == 0) {
-			SetTextPosition(CounterPos, Console.Rows - 2);
+			SetTextPosition(CounterPos, gConsole.Rows - 2);
 			Print(L"%d]   ", i / 1000);
 		}
 		Sleep(200000);

@@ -141,3 +141,83 @@ BOOLEAN IsTestSystem(VOID)
 
 	return FALSE;
 }
+
+/**
+  Return a driver name from a driver handle.
+  Note that this call does not attempt to resolve the name of drivers
+  that support multiple languages.
+
+  @param[in]  DriverHandle  A handle to the driver.
+
+  @retval     The driver name or "(unknown driver)".
+**/
+STATIC CHAR16* GetDriverName(
+	CONST EFI_HANDLE DriverHandle
+)
+{
+	CHAR16* DriverName;
+	EFI_COMPONENT_NAME_PROTOCOL* ComponentName;
+	EFI_COMPONENT_NAME2_PROTOCOL* ComponentName2;
+
+	// Try EFI_COMPONENT_NAME2 protocol first
+	if ((gBS->OpenProtocol(DriverHandle, &gEfiComponentName2ProtocolGuid, (VOID**)&ComponentName2,
+		gMainImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL) == EFI_SUCCESS) &&
+		(ComponentName2->GetDriverName(ComponentName2, ComponentName2->SupportedLanguages, &DriverName) == EFI_SUCCESS))
+		return DriverName;
+
+	// Fallback to EFI_COMPONENT_NAME if that didn't work
+	if ((gBS->OpenProtocol(DriverHandle, &gEfiComponentNameProtocolGuid, (VOID**)&ComponentName,
+		gMainImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL) == EFI_SUCCESS) &&
+		(ComponentName->GetDriverName(ComponentName, ComponentName->SupportedLanguages, &DriverName) == EFI_SUCCESS))
+		return DriverName;
+
+	return L"(unknown driver)";
+}
+
+/**
+  Detect if we are running of an NTFS partition with the buggy AMI NTFS file system
+  driver (See: https://github.com/pbatard/AmiNtfsBug)
+
+  @param[in]  DeviceHandle  A handle to the device running our boot image.
+
+  @retval     TRUE          The boot partition is serviced by the AMI NTFS driver.
+  @retval     FALSE         A non AMI NTFS file system driver is being used.
+**/
+BOOLEAN IsProblematicNtfsDriver(
+	CONST EFI_HANDLE DeviceHandle
+)
+{
+	EFI_STATUS Status;
+	UINTN Index, Count, DriverVersion;
+	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY* OpenInfo;
+	EFI_DRIVER_BINDING_PROTOCOL* DriverBinding;
+	CHAR16* DriverName;
+
+	// Open the disk instance associated with the boot image handle
+	Status = gBS->OpenProtocolInformation(DeviceHandle, &gEfiDiskIoProtocolGuid,
+		&OpenInfo, &Count);
+	if (EFI_ERROR(Status) || (Count == 0))
+		return FALSE;
+
+	// One of the drivers servicing the disk instance will be a file system driver
+	for (Index = 0; Index < Count; Index++) {
+		Status = gBS->OpenProtocol(OpenInfo[Index].AgentHandle,
+			&gEfiDriverBindingProtocolGuid, (VOID**)&DriverBinding,
+			gMainImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+		if (EFI_ERROR(Status))
+			continue;
+
+		// Obtain the driver name and version
+		DriverName = GetDriverName(OpenInfo[Index].AgentHandle);
+		DriverVersion = DriverBinding->Version;
+
+		// Close the protocol
+		gBS->CloseProtocol(OpenInfo[Index].AgentHandle,
+			&gEfiDriverBindingProtocolGuid, gMainImageHandle, NULL);
+
+		// Assume that any version of the AMI driver under 0x20000 is bad
+		if (StrCmp(DriverName, L"AMI NTFS Driver") == 0 && DriverVersion < 0x20000)
+			return TRUE;
+	}
+	return FALSE;
+}

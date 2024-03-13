@@ -40,6 +40,8 @@
 
 #include <Protocol/ComponentName.h>
 #include <Protocol/ComponentName2.h>
+#include <Protocol/DiskIo.h>
+#include <Protocol/DiskIo2.h>
 #include <Protocol/LoadedImage.h>
 
 #include <Guid/FileInfo.h>
@@ -63,18 +65,21 @@
  * Global variables
  */
 
+ /* Copy of the main Image Handle */
+extern EFI_HANDLE           gMainImageHandle;
+
 /* Set to true when we are running the GitHub Actions tests */
-extern BOOLEAN              IsTestMode;
+extern BOOLEAN              gIsTestMode;
 
 /* Dimensions of the UEFI text console */
 typedef struct {
 	UINTN Cols;
 	UINTN Rows;
 } CONSOLE_DIMENSIONS;
-extern CONSOLE_DIMENSIONS   Console;
+extern CONSOLE_DIMENSIONS   gConsole;
 
 /* Incremental vertical position at which we display alert messages */
-extern UINTN                AlertYPos;
+extern UINTN                gAlertYPos;
 
 /* SMBIOS vendor name used by GitHub Actions' qemu when running the tests */
 #define TESTING_SMBIOS_NAME "GitHub Actions Test"
@@ -149,7 +154,7 @@ typedef UINT32              CHAR32;
 #define BANNER_LINE_SIZE     79
 
 /*
- * Console colours we will be using
+ * gConsole colours we will be using
  */
 #define TEXT_DEFAULT         EFI_TEXT_ATTR(EFI_LIGHTGRAY, EFI_BLACK)
 #define TEXT_REVERSED        EFI_TEXT_ATTR(EFI_BLACK, EFI_LIGHTGRAY)
@@ -162,8 +167,8 @@ typedef UINT32              CHAR32;
 /*
  * Set and restore the console text colour
  */
-#define SetText(attr)        do { if (!IsTestMode) gST->ConOut->SetAttribute(gST->ConOut, (attr)); } while(0)
-#define DefText()            do { if (!IsTestMode) gST->ConOut->SetAttribute(gST->ConOut, TEXT_DEFAULT); } while(0)
+#define SetText(attr)        do { if (!gIsTestMode) gST->ConOut->SetAttribute(gST->ConOut, (attr)); } while(0)
+#define DefText()            do { if (!gIsTestMode) gST->ConOut->SetAttribute(gST->ConOut, TEXT_DEFAULT); } while(0)
 
 /* Types of progress */
 #define PROGRESS_TYPE_FILE 0
@@ -184,23 +189,23 @@ typedef struct {
 /*
  * Convenience macros to print informational, warning or error messages.
  */
-#define PrintInfo(fmt, ...)     do { SetTextPosition(0, AlertYPos++); \
+#define PrintInfo(fmt, ...)     do { SetTextPosition(0, gAlertYPos++); \
                                      SetText(TEXT_WHITE); Print(L"[INFO]"); DefText(); \
                                      Print(L" " fmt L"\n", ##__VA_ARGS__); } while(0)
-#define PrintWarning(fmt, ...)  do { SetTextPosition(0, AlertYPos++); \
+#define PrintWarning(fmt, ...)  do { SetTextPosition(0, gAlertYPos++); \
                                      SetText(TEXT_YELLOW); Print(L"[WARN]"); DefText(); \
                                      Print(L" " fmt L"\n", ##__VA_ARGS__); } while(0)
-#define PrintError(fmt, ...)    do { SetTextPosition(0, AlertYPos++); \
+#define PrintError(fmt, ...)    do { SetTextPosition(0, gAlertYPos++); \
                                      SetText(TEXT_RED); Print(L"[FAIL]"); DefText(); \
                                      Print(L" " fmt L": [%d] %r\n", ##__VA_ARGS__, (Status&0x7FFFFFFF), Status); } while (0)
-#define PrintTest(fmt, ...)     do { if (IsTestMode) Print(L"[TEST] " fmt L"\n", ##__VA_ARGS__); } while(0)
+#define PrintTest(fmt, ...)     do { if (gIsTestMode) Print(L"[TEST] " fmt L"\n", ##__VA_ARGS__); } while(0)
 
 /* Convenience macro to position text on screen (when not running in test mode). */
-#define SetTextPosition(x, y)   do { if (!IsTestMode) gST->ConOut->SetCursorPosition(gST->ConOut, x, y);} while (0)
+#define SetTextPosition(x, y)   do { if (!gIsTestMode) gST->ConOut->SetCursorPosition(gST->ConOut, x, y);} while (0)
 
 /* Convenience assertion macro */
 #define P_ASSERT(f, l, a)   do { if(!(a)) { Print(L"\n*** ASSERT FAILED: %a(%d): %a ***\n", f, l, #a); \
-                                          if (IsTestMode) ShutDown(); else Halt(); } } while(0)
+                                          if (gIsTestMode) ShutDown(); else Halt(); } } while(0)
 #define V_ASSERT(a)         P_ASSERT(__FILE__, __LINE__, a)
 
 /*
@@ -367,6 +372,19 @@ STATIC __inline VOID _SafeStrCat(CHAR16* Destination, UINTN DestMax,
 BOOLEAN IsTestSystem(VOID);
 
 /**
+  Detect if we are running of an NTFS partition with the buggy AMI NTFS file system
+  driver (See: https://github.com/pbatard/AmiNtfsBug)
+
+  @param[in]  DeviceHandle  A handle to the device running our boot image.
+
+  @retval     TRUE          The boot partition is serviced by the AMI NTFS driver.
+  @retval     FALSE         A non AMI NTFS file system driver is being used.
+**/
+BOOLEAN IsProblematicNtfsDriver(
+	CONST EFI_HANDLE DeviceHandle
+);
+
+/**
   Parse a hash sum list file and populate a HASH_LIST structure from it.
 
   @param[in]  Root   A file handle to the root directory.
@@ -429,7 +447,7 @@ EFI_STATUS Utf8ToUcs2(
 );
 
 /**
-  Console initialisation.
+  gConsole initialisation.
 **/
 VOID InitConsole(VOID);
 

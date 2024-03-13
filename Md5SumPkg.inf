@@ -48,6 +48,8 @@
   gEfiSmbios3TableGuid
 
 [Protocols]
+  gEfiDiskIoProtocolGuid
+  gEfiDiskIo2ProtocolGuid
   gEfiLoadedImageProtocolGuid 
   gEfiSimpleFileSystemProtocolGuid
   gEfiUnicodeCollationProtocolGuid
