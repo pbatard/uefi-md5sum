@@ -310,7 +310,7 @@ EFI_STATUS EFIAPI efi_main(
 
 	// Detect if we are booting from an NTFS partition served by the buggy
 	// AMI NTFS driver and alert the user if that is the case.
-	if (!IsProblematicNtfsDriver(DeviceHandle)) {
+	if (IsProblematicNtfsDriver(DeviceHandle)) {
 		PrintWarning(L"Buggy AMI NTFS driver detected!");
 		PrintWarning(L"This driver may produce unexpected checksum errors.");
 		PrintWarning(L"For details, see https://github.com/pbatard/AmiNtfsBug.");

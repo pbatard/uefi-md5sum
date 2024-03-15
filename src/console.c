@@ -37,7 +37,7 @@ STATIC struct {
 } Scroll = { 0 };
 
 /**
-  gConsole initialisation.
+  Console initialisation.
 **/
 VOID InitConsole(VOID)
 {

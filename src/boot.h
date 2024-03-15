@@ -117,7 +117,7 @@ extern UINTN                gAlertYPos;
 /* Shorthand for Unicode strings */
 typedef UINT32              CHAR32;
 
-/* Maximum size allowed for hash file we process */
+/* Maximum size allowed for the hash file we process */
 #define HASH_FILE_SIZE_MAX  (64 * 1024 * 1024)
 
 /* Maximum number of lines allowed in a hash file */
@@ -154,7 +154,7 @@ typedef UINT32              CHAR32;
 #define BANNER_LINE_SIZE     79
 
 /*
- * gConsole colours we will be using
+ * Console colours we will be using
  */
 #define TEXT_DEFAULT         EFI_TEXT_ATTR(EFI_LIGHTGRAY, EFI_BLACK)
 #define TEXT_REVERSED        EFI_TEXT_ATTR(EFI_BLACK, EFI_LIGHTGRAY)
@@ -447,7 +447,7 @@ EFI_STATUS Utf8ToUcs2(
 );
 
 /**
-  gConsole initialisation.
+  Console initialisation.
 **/
 VOID InitConsole(VOID);
 
