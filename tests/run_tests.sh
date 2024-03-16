@@ -3,14 +3,14 @@
 ## @file
 #  Test script for MD5Sum.
 #
-#  Copyright (c) 2023, Pete Batard <pete@akeo.ie>
+#  Copyright (c) 2023-2024, Pete Batard <pete@akeo.ie>
 #
 #  SPDX-License-Identifier: GPL-2.0-or-later
 #
 ##
 
 TEST_DIR=./run
-LINE_LEN=60
+LINE_LEN=64
 TIMEOUT=2m
 MIN_TEST="${1:-001}"
 MAX_TEST="${2:-999}"
@@ -28,6 +28,16 @@ for t in $TEST_DIR/*.dat; do
   base=$(basename "${t%.dat}")
   test_number=${base:0:3}
   test_name=${base:4}
+  use_diff=1
+  dump_hashlist=0
+
+  # If a test starts with 'Fuzzing', use grep instead of diff
+  # and also dump the generated md5sum.txt on error
+  if [[ "$test_name" =~ ^"Fuzzing" ]]; then
+    dump_hashlist=1
+    use_diff=0
+  fi 
+
   test_desc="Test #$test_number: ${test_name}... "
   nb_lines=$(wc -l < "$t")
   if [[ $nb_lines -eq 0 ]]; then
@@ -60,13 +70,29 @@ for t in $TEST_DIR/*.dat; do
   err=$?
   if [[ $err -eq 124 ]]; then
     echo "[ERROR] (Time out)"
+    if [[ $dump_hashlist -ne 0 ]]; then
+      echo "Content of md5sum.txt was:"
+      echo "-------------------------------------------------------------------------------"
+      hexdump -C image/md5sum.txt
+      echo "-------------------------------------------------------------------------------"
+    fi
     NUM_ERROR=$((NUM_ERROR + 1))
   elif [[ $err -ne 0 ]]; then
-    echo "[ERROR]"
+    echo "[ERROR] ($err)"
     cat error.txt
+    if [[ $dump_hashlist -ne 0 ]]; then
+      echo "Content of md5sum.txt was:"
+      echo "-------------------------------------------------------------------------------"
+      hexdump -C image/md5sum.txt
+      echo "-------------------------------------------------------------------------------"
+    fi
     NUM_ERROR=$((NUM_ERROR + 1))
   else
-    tail -n $nb_lines output.txt | diff -Z --strip-trailing-cr -q "$t" - >/dev/null 2>&1
+    if [[ $use_diff -ne 0 ]]; then
+      tail -n $nb_lines output.txt | diff -Z --strip-trailing-cr -q "$t" - >/dev/null 2>&1
+    else
+      tail -n +3 output.txt | grep -F -f "$t" >/dev/null 2>&1
+    fi
     if [[ $? -eq 0 ]]; then
       echo "[PASS]"
       NUM_PASS=$((NUM_PASS + 1))
@@ -77,6 +103,12 @@ for t in $TEST_DIR/*.dat; do
       echo "-------------------------------------------------------------------------------"
       tail -n +3 output.txt
       echo "-------------------------------------------------------------------------------"
+      if [[ $dump_hashlist -ne 0 ]]; then
+        echo "Content of md5sum.txt was:"
+        echo "-------------------------------------------------------------------------------"
+        hexdump -C image/md5sum.txt
+        echo "-------------------------------------------------------------------------------"
+      fi
     fi
   fi
 

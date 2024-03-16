@@ -284,7 +284,7 @@ Test bootloader
 Test bootloader
 < rm -f image/efi/boot/*_original.efi
 
-# Progress with TotalBytes too small 
+# Progress with TotalBytes too small
 > echo "# md5sum_totalbytes = 0x1" > image/md5sum.txt
 > for i in {64..1024..64}; do dd if=/dev/urandom of=image/file$i bs=1k count=$i; done
 > (cd image; md5sum file* >> md5sum.txt)
@@ -332,7 +332,7 @@ file960 (960 KB)
 16/16 files processed [0 failed]
 < rm image/file*
 
-# Progress with TotalBytes too large 
+# Progress with TotalBytes too large
 > echo "# md5sum_totalbytes = 0x1234567890abcdef" > image/md5sum.txt
 > for i in {64..1024..64}; do dd if=/dev/urandom of=image/file$i bs=1k count=$i; done
 > (cd image; md5sum file* >> md5sum.txt)
@@ -355,3 +355,232 @@ file896 (896 KB)
 file960 (960 KB)
 16/16 files processed [0 failed]
 < rm image/file*
+
+# Fuzzing test: 100 Random bytes in hash list
+> dd if=/dev/urandom bs=100 count=1 of=image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 1000 Random bytes in hash list
+> dd if=/dev/urandom bs=1000 count=1 of=image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 10000 Random bytes in hash list
+> dd if=/dev/urandom bs=10000 count=1 of=image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 100000 Random bytes in hash list
+> dd if=/dev/urandom bs=100000 count=1 of=image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 50 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=50 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 100 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=100 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 150 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=150 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 200 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=200 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 250 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=250 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 300 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=300 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 350 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=350 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 400 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=400 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 450 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=450 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 500 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=500 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 550 Random bytes in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> dd if=/dev/urandom bs=550 count=1 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 50 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 50 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 100 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 100 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 150 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 150 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 200 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 200 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 250 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 250 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 300 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 300 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 350 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 350 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 400 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 400 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 450 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 450 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 500 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 500 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 550 Random chars in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -d '[:cntrl:]' </dev/urandom | head -c 550 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: 50 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 50 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 100 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 100 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 150 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 150 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 200 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 200 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 250 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 250 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 300 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 300 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 350 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 350 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 400 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 400 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 450 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 450 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 500 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 500 >> image/md5sum.txt
+1/1 file processed [1 failed]
+
+# Fuzzing test: 550 Random ascii in path
+> tr -cd '0-9a-f' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo -n " " >> image/md5sum.txt
+> tr -cd '[:print:]' </dev/urandom | head -c 550 >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: Random bytes in hash
+> dd if=/dev/urandom bs=32 count=1 > image/md5sum.txt
+> echo " some/path" >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: Random ascii in hash
+> tr -cd '[:print:]' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo " some/path" >> image/md5sum.txt
+[21] Aborted
+
+# Fuzzing test: Random hexascii in hash
+> tr -cd '0-9a-fA-F' </dev/urandom | head -c 32 > image/md5sum.txt
+> echo " some/path" >> image/md5sum.txt
+[14] Not Found
