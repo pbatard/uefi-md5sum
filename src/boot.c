@@ -208,34 +208,42 @@ STATIC EFI_STATUS ExitProcess(
 {
 	UINTN Index;
 	EFI_HANDLE ImageHandle;
-	EFI_INPUT_KEY Key;
-	BOOLEAN RunCountDown = TRUE;
+	EFI_INPUT_KEY Key = { 0 };
+	BOOLEAN AskToContinue, SkipCountDown;
+
+	AskToContinue = (EFI_ERROR(Status) && (Status != EFI_ABORTED) &&
+		(Status != EFI_NOT_FOUND) && !gIsTestMode);
+	SkipCountDown = (Status == EFI_NOT_FOUND || Status == EFI_ABORTED);
 
 	// If we have a bootloader to chain load, try to launch it
 	if (DevicePath != NULL) {
-		if (EFI_ERROR(Status) && Status != EFI_ABORTED && !gIsTestMode) {
-			// Ask the user if they want to continue, unless md5sum.txt could
-			// not be found, in which case continue boot right away.
-			if (Status != EFI_NOT_FOUND) {
-				SetText(TEXT_YELLOW);
-				// Give the user 1 hour to answer the question
-				gBS->SetWatchdogTimer(3600, 0x11D5, 0, NULL);
-				PrintCentered(L"Continue with boot? [y/N]", gConsole.Rows - 2);
-				gST->ConIn->Reset(gST->ConIn, FALSE);
-				while (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) == EFI_NOT_READY);
-				if (Key.UnicodeChar != L'y' && Key.UnicodeChar != L'Y') {
+		if (AskToContinue) {
+			SetText(TEXT_YELLOW);
+			// Give the user 1 hour to answer the question
+			gBS->SetWatchdogTimer(3600, 0x11D5, 0, NULL);
+			gST->ConIn->Reset(gST->ConIn, FALSE);
+			PrintCentered(L"Continue with boot? [y/n]", gConsole.Rows - 2);
+			// Wait for a key to be pressed
+			while (1) {
+				gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
+				if (gST->ConIn->ReadKeyStroke(gST->ConIn, &Key) != EFI_SUCCESS)
+					continue;
+				// Force an explicit y/n
+				if (Key.UnicodeChar == L'n' || Key.UnicodeChar == L'N') {
 					SafeFree(DevicePath);
-					return Status;
+					return EFI_ABORTED;
 				}
+				if (Key.UnicodeChar == L'y' || Key.UnicodeChar == L'Y')
+					break;
 			}
-			RunCountDown = FALSE;
+			SkipCountDown = TRUE;
 		}
 		// Reset the watchdog to the default 5 minutes timeout and system code
 		gBS->SetWatchdogTimer(300, 0, 0, NULL);
 		Status = gBS->LoadImage(FALSE, gMainImageHandle, DevicePath, NULL, 0, &ImageHandle);
 		SafeFree(DevicePath);
 		if (Status == EFI_SUCCESS) {
-			if (RunCountDown)
+			if (!SkipCountDown)
 				CountDown(L"Continuing in", 3000);
 			if (!gIsTestMode)
 				gST->ConOut->ClearScreen(gST->ConOut);
@@ -405,7 +413,7 @@ EFI_STATUS EFIAPI efi_main(
 
 out:
 	SafeFree(HashList.Buffer);
-	if (Status == EFI_SUCCESS && NumFailed != 0)
+	if (NumFailed != 0)
 		Status = EFI_CRC_ERROR;
 	return ExitProcess(Status, DevicePath);
 }
