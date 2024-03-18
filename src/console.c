@@ -72,6 +72,23 @@ VOID InitConsole(VOID)
 }
 
 /**
+  Flush the keyboard input buffers.
+**/
+VOID FlushKeyboardInput(VOID)
+{
+	EFI_INPUT_KEY Key = { 0 };
+
+	gST->ConIn->Reset(gST->ConIn, TRUE);
+	// Per specs, the above is supposed to be enough to clear the keystroke
+	// buffer. However, some firmwares do not seem to be specs compliant so
+	// we add additional manual flushing.
+	while (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY) {
+		gST->ConIn->ReadKeyStroke(gST->ConIn, &Key);
+		Sleep(50000);
+	}
+}
+
+/**
   Print a centered message on the console.
 
   @param[in]  Message    The text message to print.
@@ -323,7 +340,7 @@ VOID CountDown(
 	SetText(TEXT_YELLOW);
 	Print(L"[%s ", Message);
 
-	gST->ConIn->Reset(gST->ConIn, FALSE);
+	FlushKeyboardInput();
 	for (i = (INTN)Duration; i >= 0; i -= 200) {
 		// Allow the user to press a key to interrupt the countdown
 		if (gST->BootServices->CheckEvent(gST->ConIn->WaitForKey) != EFI_NOT_READY)

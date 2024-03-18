@@ -258,6 +258,13 @@ STATIC __inline EFI_STATUS Sleep(UINTN MicroSeconds)
 	return gBS->Stall(MicroSeconds);
 }
 
+/* Reset the system immediately */
+NO_RETURN STATIC __inline VOID Reset()
+{
+	gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
+	while (1);
+}
+
 /* Shut down the system immediately */
 NO_RETURN STATIC __inline VOID ShutDown()
 {
@@ -450,6 +457,11 @@ EFI_STATUS Utf8ToUcs2(
   Console initialisation.
 **/
 VOID InitConsole(VOID);
+
+/**
+  Flush the keyboard input buffers.
+**/
+VOID FlushKeyboardInput(VOID);
 
 /**
   Initialize a scrolling section on the console.

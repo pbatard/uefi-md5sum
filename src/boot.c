@@ -221,7 +221,7 @@ STATIC EFI_STATUS ExitProcess(
 			SetText(TEXT_YELLOW);
 			// Give the user 1 hour to answer the question
 			gBS->SetWatchdogTimer(3600, 0x11D5, 0, NULL);
-			gST->ConIn->Reset(gST->ConIn, FALSE);
+			FlushKeyboardInput();
 			PrintCentered(L"Continue with boot? [y/n]", gConsole.Rows - 2);
 			// Wait for a key to be pressed
 			while (1) {
@@ -231,7 +231,7 @@ STATIC EFI_STATUS ExitProcess(
 				// Force an explicit y/n
 				if (Key.UnicodeChar == L'n' || Key.UnicodeChar == L'N') {
 					SafeFree(DevicePath);
-					return EFI_ABORTED;
+					Reset();
 				}
 				if (Key.UnicodeChar == L'y' || Key.UnicodeChar == L'Y')
 					break;
@@ -266,7 +266,7 @@ STATIC EFI_STATUS ExitProcess(
 		SetText(TEXT_YELLOW);
 		PrintCentered(L"[Press any key to exit]", gConsole.Rows - 2);
 		DefText();
-		gST->ConIn->Reset(gST->ConIn, FALSE);
+		FlushKeyboardInput();
 		gST->BootServices->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
 #if defined(EFI_DEBUG)
 		ShutDown();
@@ -352,6 +352,9 @@ EFI_STATUS EFIAPI efi_main(
 	if (!gIsTestMode)
 		PrintCentered(L"[Press any key to cancel]", gConsole.Rows - 2);
 	DefText();
+
+	// Flush the keyboard input before we check for user cancel
+	FlushKeyboardInput();
 
 	// Set up the scroll section where we display individual file validation errors
 	Status = InitScrollSection(gConsole.Rows / 2 + 1, gConsole.Rows / 2 - 4);
