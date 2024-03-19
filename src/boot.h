@@ -71,6 +71,9 @@ extern EFI_HANDLE           gMainImageHandle;
 /* Set to true when we are running the GitHub Actions tests */
 extern BOOLEAN              gIsTestMode;
 
+/* Amount of time to pause after a read (in μs) */
+extern UINTN                gPauseAfterRead;
+
 /* Dimensions of the UEFI text console */
 typedef struct {
 	UINTN Cols;
@@ -377,6 +380,15 @@ STATIC __inline VOID _SafeStrCat(CHAR16* Destination, UINTN DestMax,
   @retval FALSE  A regular plaform is being used.
 **/
 BOOLEAN IsTestSystem(VOID);
+
+/**
+  Detect if we are running an early AMI UEFI v2.0 system, that can't process USB
+  keyboard inputs unless we give it time to breathe.
+
+  @retval TRUE   An AMI v2.0 UEFI firmware was detected.
+  @retval FALSE  The system is not AMI v2.0 UEFI.
+**/
+BOOLEAN IsEarlyAmiUefi(VOID);
 
 /**
   Detect if we are running of an NTFS partition with the buggy AMI NTFS file system

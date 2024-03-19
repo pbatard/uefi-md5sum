@@ -340,6 +340,13 @@ EFI_STATUS HashFile(
 	for (ReadBytes = 0; ; ReadBytes += ReadSize) {
 		ReadSize = READ_BUFFERSIZE;
 		Status = File->Read(File, &ReadSize, Buffer);
+		// Early AMI UEFI v2.0 firmwares, such as the ones found in Dell
+		// Optiplex 390s, are unable to process USB keyboard input when
+		// the USB bus is simultaneously used to read data at high speed.
+		// So we pause these systems, to give them enough time to "breathe"
+		// and process USB keyboard cancellation.
+		if (gPauseAfterRead != 0)
+			Sleep(gPauseAfterRead);
 		if (EFI_ERROR(Status))
 			goto out;
 		if (ReadSize == 0)

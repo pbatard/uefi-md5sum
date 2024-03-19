@@ -1,6 +1,6 @@
 /*
  * uefi-md5sum: UEFI MD5Sum validator - System Information
- * Copyright © 2014-2023 Pete Batard <pete@akeo.ie>
+ * Copyright © 2014-2024 Pete Batard <pete@akeo.ie>
  * With parts from EDK © 1998  Intel Corporation
  *
  * This program is free software: you can redistribute it and/or modify
@@ -140,6 +140,19 @@ BOOLEAN IsTestSystem(VOID)
 	}
 
 	return FALSE;
+}
+
+/**
+  Detect if we are running an early AMI UEFI v2.0 system, that can't
+  process USB keyboard inputs unless we give it time to breathe.
+
+  @retval TRUE   An AMI v2.0 UEFI firmware was detected.
+  @retval FALSE  The system is not AMI v2.0 UEFI.
+**/
+BOOLEAN IsEarlyAmiUefi(VOID)
+{
+	return (StrCmp(gST->FirmwareVendor, L"American Megatrends") == 0 &&
+		gST->Hdr.Revision == 0x20000);
 }
 
 /**

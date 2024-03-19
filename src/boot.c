@@ -28,6 +28,12 @@ EFI_HANDLE gMainImageHandle = NULL;
  */
 BOOLEAN gIsTestMode = FALSE;
 
+/*
+ * Amount of time to pause after a read, in order to give buggy UEFI
+ * firmwares enough time to process USB keyboard input (in μs).
+ */
+UINTN gPauseAfterRead = 0;
+
 /* Strings used for platform identification */
 #if defined(_M_X64) || defined(__x86_64__)
 STATIC CHAR16* Arch = L"x64";
@@ -314,6 +320,13 @@ EFI_STATUS EFIAPI efi_main(
 	if (EFI_ERROR(Status)) {
 		PrintError(L"Could not open root directory");
 		goto out;
+	}
+
+	// Detect if we are booting on an early AMI UEFI v2.0 system
+	if (IsEarlyAmiUefi()) {
+		PrintWarning(L"Early AMI UEFI firmware detected!");
+		PrintWarning(L"This system may have trouble processing keyboard input.");
+		gPauseAfterRead = 5000;
 	}
 
 	// Detect if we are booting from an NTFS partition served by the buggy
