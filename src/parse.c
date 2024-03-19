@@ -188,8 +188,14 @@ EFI_STATUS Parse(
 							}
 							NumDigits++;
 							TotalBytes <<= 4;
-							TotalBytes |= (UINT64)(((HashFile[c] - '0') < 0xa) ?
-								(HashFile[c] - '0') : (HashFile[c] - 'a' + 0xa));
+							// IsValidHexAscii() above made sure that our character
+							// is in the [0-9] or [A-F] or [a-f] ranges.
+							if (HashFile[c] - '0' < 0xa)
+								TotalBytes |= HashFile[c] - '0';
+							else if (HashFile[c] - 'A' < 6)
+								TotalBytes |= HashFile[c] - 'A' + 0xa;
+							else
+								TotalBytes |= HashFile[c] - 'a' + 0xa;
 						}
 					}
 				}

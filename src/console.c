@@ -290,18 +290,15 @@ VOID UpdateProgress(
 		gConsole.Cols < COLS_MIN || gConsole.Cols >= STRING_MAX)
 		return;
 
-	if (Progress->Current > Progress->Maximum)
-		Progress->Current = Progress->Maximum;
-
 	// Update the percentage figure
-	PerMille = (UINTN)((Progress->Current * 1000) / Progress->Maximum);
+	PerMille = (UINTN)((MIN(Progress->Current, Progress->Maximum) * 1000) / Progress->Maximum);
 	if (!gIsTestMode) {
 		SetTextPosition(Progress->PPos, Progress->YPos);
 		Print(L"%d.%d%%", PerMille / 10, PerMille % 10);
 	}
 
 	// Update the progress bar
-	CurCol = (UINTN)((Progress->Current * gConsole.Cols) / Progress->Maximum);
+	CurCol = (UINTN)((MIN(Progress->Current, Progress->Maximum) * gConsole.Cols) / Progress->Maximum);
 	if (!gIsTestMode) {
 		for (; CurCol > Progress->LastCol && Progress->LastCol < gConsole.Cols; Progress->LastCol++) {
 			SetTextPosition(Progress->LastCol, Progress->YPos + 1);
@@ -309,7 +306,7 @@ VOID UpdateProgress(
 		}
 	}
 
-	if (Progress->Current == Progress->Maximum)
+	if (Progress->Current >= Progress->Maximum)
 		Progress->Active = FALSE;
 }
 

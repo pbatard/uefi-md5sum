@@ -177,6 +177,13 @@ file: [14] Not Found
 file: [14] Not Found
 1/1 file processed [1 failed]
 
+# TotalBytes mixed case
+> echo "# md5sum_totalbytes = 0xaAbBcCdDeEfF" > image/md5sum.txt
+> echo "00112233445566778899aabbccddeeff file" >> image/md5sum.txt
+[TEST] TotalBytes = 0xAABBCCDDEEFF
+file: [14] Not Found
+1/1 file processed [1 failed]
+
 # MD5 basic validation for up to 2-blocks
 > # Tests all sizes up to 2-blocks (2 x 64 bytes)
 > for size in {000..128}; do
@@ -306,6 +313,7 @@ file832 (832 KB)
 file896 (896 KB)
 file960 (960 KB)
 16/16 files processed [0 failed]
+[WARN] Actual 'md5sum_totalbytes' was 0x880000
 < rm image/file*
 
 # Progress with TotalBytes exact
@@ -354,6 +362,7 @@ file832 (832 KB)
 file896 (896 KB)
 file960 (960 KB)
 16/16 files processed [0 failed]
+[WARN] Actual 'md5sum_totalbytes' was 0x880000
 < rm image/file*
 
 # Fuzzing test: 100 Random bytes in hash list

@@ -353,7 +353,7 @@ EFI_STATUS EFIAPI efi_main(
 	V_ASSERT(HashList.Entry != NULL);
 
 	// Print any extra data we want to validate
-	PrintTest(L"TotalBytes = 0x%lX", HashList.TotalBytes);
+	PrintTest(L"TotalBytes = 0x%lx", HashList.TotalBytes);
 
 	// Set up the progress bar data
 	Progress.Type = (HashList.TotalBytes == 0) ? PROGRESS_TYPE_FILE : PROGRESS_TYPE_BYTE;
@@ -426,6 +426,9 @@ EFI_STATUS EFIAPI efi_main(
 	UnicodeSPrint(Message, ARRAY_SIZE(Message), L"%d/%d file%s processed [%d failed]",
 		Index, HashList.NumEntries, (HashList.NumEntries == 1) ? L"" : L"s", NumFailed);
 	PrintCentered(Message, Progress.YPos + 2);
+	if (Status == EFI_SUCCESS && HashList.TotalBytes != 0 &&
+		Progress.Current != HashList.TotalBytes)
+		PrintWarning(L"Actual 'md5sum_totalbytes' was 0x%lx", Progress.Current);
 
 out:
 	SafeFree(HashList.Buffer);

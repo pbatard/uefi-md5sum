@@ -246,7 +246,7 @@ typedef struct {
 /* Check for a valid lowercase hex ASCII value */
 STATIC __inline BOOLEAN IsValidHexAscii(CHAR8 c)
 {
-	return ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+	return ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'));
 }
 
 /* Check for a valid whitespace character */

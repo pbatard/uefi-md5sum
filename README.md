@@ -56,10 +56,10 @@ as well the avoidance of apparent progress "freezeouts" when very large files
 are being hashed (such as large squashfs or install.wim images).
 
 It should be noted however that, currently, uefi-md5sum supports only the
-provision of an `md5sum_totalbytes` value in **lowercase** hexadecimal (no
-uppercase hex, no decimal). On the other hand, there is no restriction to where,
-in `md5sum.txt`, `md5sum_totalbytes` needs to be specified (i.e. it does not
-necessarily mean to appear at the beginning of the file).
+provision of an `md5sum_totalbytes` value in hexadecimal (no decimal values).
+On the other hand, there is no restriction to where, in `md5sum.txt`,
+`md5sum_totalbytes` needs to be specified (i.e. it does not necessarily need to
+appear at the beginning of the file).
 
 ## Prerequisites
 
