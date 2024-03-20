@@ -60,4 +60,4 @@
   gEfiMdePkgTokenSpaceGuid.PcdUefiVariableDefaultPlatformLang
 
 [BuildOptions]
-  RELEASE_*_*_CC_FLAGS    = -O2 -DMDEPKG_NDEBUG -DNDEBUG
+  RELEASE_*_*_CC_FLAGS    = -O2 -DMDEPKG_NDEBUG -DNDEBUG -DVERSION_STRING=$(VERSION_STRING)

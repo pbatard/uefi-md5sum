@@ -18,6 +18,17 @@
 
 #include "boot.h"
 
+/* Stringification macros */
+#define _TO_WSTRING(s) L ## #s
+#define TO_WSTRING(s) _TO_WSTRING(s)
+
+/* Setup a version string */
+#if defined(VERSION_STRING)
+#define WVERSION_STRING TO_WSTRING(VERSION_STRING)
+#else
+#define WVERSION_STRING L"[DEV]"
+#endif
+
 /* Dimensions of the UEFI text console */
 CONSOLE_DIMENSIONS gConsole = { COLS_MIN, ROWS_MIN };
 
@@ -65,9 +76,9 @@ VOID InitConsole(VOID)
 		EmptyLine[i] = L' ';
 	EmptyLine[i] = L'\0';
 
-	// Print the reference URL of this application
+	// Print the version and reference URL of this application
 	SetText(TEXT_DARKGRAY);
-	PrintCentered(L"https://md5.akeo.ie", 0);
+	PrintCentered(L"md5sum " WVERSION_STRING L" <https://md5.akeo.ie>", 0);
 	DefText();
 }
 

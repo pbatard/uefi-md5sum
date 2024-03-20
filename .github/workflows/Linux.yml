@@ -20,6 +20,8 @@ env:
 jobs:
   Linux-EDK2-Build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     strategy:
       matrix:
