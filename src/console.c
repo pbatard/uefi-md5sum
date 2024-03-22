@@ -78,7 +78,7 @@ VOID InitConsole(VOID)
 
 	// Print the version and reference URL of this application
 	SetText(TEXT_DARKGRAY);
-	PrintCentered(L"md5sum " WVERSION_STRING L" <https://md5.akeo.ie>", 0);
+	PrintCentered(L"uefi-md5sum " WVERSION_STRING L" <https://md5.akeo.ie>", 0);
 	DefText();
 }
 

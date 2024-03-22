@@ -2,6 +2,7 @@
 [![Linux Build status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Linux.yml?style=flat-square&label=gcc/EDK2%20Build)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Linux.yml)
 [![Tests status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Tests.yml?style=flat-square&label=Tests)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Tests.yml)
 [![Coverity Scan Build Status](https://img.shields.io/coverity/scan/29422.svg?style=flat-square&label=Coverity)](https://scan.coverity.com/projects/pbatard-uefi-md5sum)
+[![Release](https://img.shields.io/github/release/pbatard/uefi-md5sum.svg?style=flat-square&label=Release)](https://github.com/pbatard/uefi-md5sum/releases)
 [![Licence](https://img.shields.io/badge/license-GPLv2-blue.svg?style=flat-square&label=License)](https://www.gnu.org/licenses/gpl-2.0.en.html)
 
 uefi-md5sum - MD5 checksum validation for UEFI
@@ -60,6 +61,16 @@ provision of an `md5sum_totalbytes` value in hexadecimal (no decimal values).
 On the other hand, there is no restriction to where, in `md5sum.txt`,
 `md5sum_totalbytes` needs to be specified (i.e. it does not necessarily need to
 appear at the beginning of the file).
+
+## md5sum.txt generation
+
+On Linux, it is very easy to generate an `md5sum.txt`, that also includes
+`md5sum_totalbytes`, by navigating to the directory that contains your content
+and then issuing:
+```sh
+find . ! -name 'md5sum.txt' -type f -exec du -cb {} + | grep total$ | cut -f 1 | xargs printf '# md5sum_totalbytes = 0x%x\n' > md5sum.txt
+find . ! -name 'md5sum.txt' -type f -exec md5sum {} \; >> md5sum.txt
+```
 
 ## Prerequisites
 
