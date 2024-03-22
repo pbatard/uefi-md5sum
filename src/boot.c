@@ -137,6 +137,9 @@ STATIC EFI_STATUS SetPathCase(
 	if (EFI_ERROR(Status))
 		goto out;
 
+	// Make sure we always start at the top of the directory list
+	FileHandle->SetPosition(FileHandle, 0);
+
 	do {
 		Size = FileInfoSize;
 		ZeroMem(FileInfo, Size);

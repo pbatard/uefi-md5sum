@@ -15,7 +15,7 @@
   BASE_NAME                  = Md5Sum
   FILE_GUID                  = 99A43E96-48DE-4B82-B726-83D6FB9A5AD9
   MODULE_TYPE                = UEFI_APPLICATION
-  VERSION_STRING             = 1.0
+  VERSION_STRING             = 1.1
   ENTRY_POINT                = efi_main
 
 [Sources]
