@@ -1,5 +1,5 @@
 /*
- * uefi-md5sum: UEFI MD5Sum validator - gConsole related functions
+ * uefi-md5sum: UEFI MD5Sum validator - Console related functions
  * Copyright © 2024 Pete Batard <pete@akeo.ie>
  *
  * This program is free software: you can redistribute it and/or modify

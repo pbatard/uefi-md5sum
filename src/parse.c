@@ -131,7 +131,7 @@ EFI_STATUS Parse(
 		goto out;
 	}
 
-	// Allocate a array of hash entries
+	// Allocate an array of hash entries
 	HashList = AllocateZeroPool(NumLines * sizeof(HASH_ENTRY));
 	if (HashList == NULL) {
 		Status = EFI_OUT_OF_RESOURCES;
