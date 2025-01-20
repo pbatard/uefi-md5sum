@@ -13,6 +13,7 @@ on:
 env:
   BUILD_TYPE: RELEASE
   COMPILER: GCC5
+  EDK2_BASE: edk2-stable202411
   GCC5_ARM_PREFIX: arm-linux-gnueabi-
   GCC5_AARCH64_PREFIX: aarch64-linux-gnu-
   GCC5_RISCV64_PREFIX: riscv64-linux-gnu-
@@ -55,11 +56,11 @@ jobs:
     - name: Set up Linux environment
       run: |
         sudo apt-get update
-        sudo apt-get -y --no-install-recommends install python3-distutils nasm uuid-dev ${{ matrix.TARGET_PKGS }}
+        sudo apt-get -y --no-install-recommends install python3-setuptools nasm uuid-dev ${{ matrix.TARGET_PKGS }}
 
     - name: Set up EDK2
       run: |
-        git clone --recursive https://github.com/tianocore/edk2.git
+        git clone --recursive https://github.com/tianocore/edk2.git -b ${{ env.EDK2_BASE }}
         make -C edk2/BaseTools
 
     - name: Build UEFI bootloader
