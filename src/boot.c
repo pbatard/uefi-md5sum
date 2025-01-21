@@ -45,6 +45,8 @@ STATIC CHAR16* Arch = L"aa64";
 STATIC CHAR16* Arch = L"arm";
 #elif defined(_M_RISCV64) || (defined (__riscv) && (__riscv_xlen == 64))
 STATIC CHAR16* Arch = L"riscv64";
+#elif defined (_M_LOONGARCH64) || defined (__loongarch64)
+STATIC CHAR16* Arch = L"loongarch64";
 #else
 #error Unsupported architecture
 #endif

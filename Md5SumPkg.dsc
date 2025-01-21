@@ -12,7 +12,7 @@
   PLATFORM_GUID                  = BB860731-B90E-4002-86E9-4152213869B7
   PLATFORM_VERSION               = 1.0
   DSC_SPECIFICATION              = 0x00010005
-  SUPPORTED_ARCHITECTURES        = IA32|X64|EBC|ARM|AARCH64|RISCV64
+  SUPPORTED_ARCHITECTURES        = IA32|X64|EBC|ARM|AARCH64|RISCV64|LOONGARCH64
   OUTPUT_DIRECTORY               = Build
   BUILD_TARGETS                  = DEBUG|RELEASE|NOOPT
   SKUID_IDENTIFIER               = DEFAULT
@@ -48,9 +48,8 @@
   # Needed to fix an undefined reference to '__udivdi3' on IA32
   NULL|CryptoPkg/Library/IntrinsicLib/IntrinsicLib.inf
 
-[LibraryClasses.ARM, LibraryClasses.AARCH64, LibraryClasses.RISCV64]
-  NULL|ArmPkg/Library/CompilerIntrinsicsLib/CompilerIntrinsicsLib.inf
-  NULL|MdePkg/Library/BaseStackCheckLib/BaseStackCheckLib.inf
+[LibraryClasses.ARM, LibraryClasses.AARCH64, LibraryClasses.RISCV64, LibraryClasses.LOONGARCH64,]
+  NULL|MdePkg/Library/CompilerIntrinsicsLib/CompilerIntrinsicsLib.inf
 
 ###################################################################################################
 #
