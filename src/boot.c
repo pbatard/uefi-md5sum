@@ -1,6 +1,6 @@
 /*
  * uefi-md5sum: UEFI MD5Sum validator
- * Copyright © 2023-2024 Pete Batard <pete@akeo.ie>
+ * Copyright © 2023-2026 Pete Batard <pete@akeo.ie>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -298,7 +298,7 @@ EFI_STATUS EFIAPI efi_main(
 {
 	EFI_STATUS Status;
 	EFI_HANDLE DeviceHandle;
-	EFI_FILE_HANDLE Root;
+	EFI_FILE_HANDLE Root = NULL;
 	EFI_DEVICE_PATH* DevicePath = NULL;
 	HASH_LIST HashList = { 0 };
 	CHAR8 c;
@@ -436,6 +436,8 @@ EFI_STATUS EFIAPI efi_main(
 		PrintWarning(L"Actual 'md5sum_totalbytes' was 0x%lx", Progress.Current);
 
 out:
+	if (Root != NULL)
+		Root->Close(Root);
 	SafeFree(HashList.Buffer);
 	if (NumFailed != 0)
 		Status = EFI_CRC_ERROR;
