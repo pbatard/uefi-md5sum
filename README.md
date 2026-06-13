@@ -1,4 +1,4 @@
-[![Windows Build Status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Windows.yml?style=flat-square&label=VS2022/gnu-efi%20Build)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Windows.yml)
+[![Windows Build Status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Windows.yml?style=flat-square&label=VS/gnu-efi%20Build)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Windows.yml)
 [![Linux Build status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Linux.yml?style=flat-square&label=gcc/EDK2%20Build)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Linux.yml)
 [![Tests status](https://img.shields.io/github/actions/workflow/status/pbatard/uefi-md5sum/Tests.yml?style=flat-square&label=Tests)](https://github.com/pbatard/uefi-md5sum/actions/workflows/Tests.yml)
 [![Coverity Scan Build Status](https://img.shields.io/coverity/scan/29422.svg?style=flat-square&label=Coverity)](https://scan.coverity.com/projects/pbatard-uefi-md5sum)
@@ -74,7 +74,7 @@ find . ! -name 'md5sum.txt' -type f -exec md5sum {} \; >> md5sum.txt
 
 ## Prerequisites
 
-* [Visual Studio 2022](https://www.visualstudio.com/vs/community/) or gcc/EDK2.
+* [Visual Studio 2026](https://www.visualstudio.com/vs/community/) or gcc/EDK2.
 * [QEMU](http://www.qemu.org) __v2.7 or later__
   (NB: You can find QEMU Windows binaries [here](https://qemu.weilnetz.de/w64/))
 

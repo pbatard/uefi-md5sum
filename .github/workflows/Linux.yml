@@ -12,12 +12,14 @@ on:
 
 env:
   BUILD_TYPE: RELEASE
-  COMPILER: GCC5
-  EDK2_BASE: edk2-stable202411
-  GCC5_ARM_PREFIX: arm-linux-gnueabi-
-  GCC5_AARCH64_PREFIX: aarch64-linux-gnu-
-  GCC5_RISCV64_PREFIX: riscv64-linux-gnu-
-  GCC5_LOONGARCH64_PREFIX: loongarch64-unknown-linux-gnu-
+  COMPILER: GCC
+  GCC_ARM_PREFIX: arm-linux-gnueabi-
+  GCC_AARCH64_PREFIX: aarch64-linux-gnu-
+  GCC_RISCV64_PREFIX: riscv64-linux-gnu-
+  GCC_LOONGARCH64_PREFIX: loongarch64-unknown-linux-gnu-
+  EDK2_STABLE_TAG: edk2-stable202508.01
+  LOONGARCH64_TOOLCHAIN_TAG: 2025.08.08
+  LOONGARCH64_TOOLCHAIN_NAME: x86_64-cross-tools-loongarch64-binutils_2.45-gcc_15.1.0-glibc_2.42.tar.xz
 
 jobs:
   Linux-EDK2-Build:
@@ -27,29 +29,30 @@ jobs:
 
     strategy:
       matrix:
+        arch: [X64, IA32, ARM, AARCH64, RISCV64, LOONGARCH64]
         include:
-        - TARGET_TYPE: x64
-          TARGET_ARCH: X64
-          TARGET_PKGS: gcc-multilib
-        - TARGET_TYPE: ia32
-          TARGET_ARCH: IA32
-          TARGET_PKGS: gcc-multilib
-        - TARGET_TYPE: aa64
-          TARGET_ARCH: AARCH64
-          TARGET_PKGS: gcc-aarch64-linux-gnu
-        - TARGET_TYPE: arm
-          TARGET_ARCH: ARM
-          TARGET_PKGS: gcc-arm-linux-gnueabi
-        - TARGET_TYPE: riscv64
-          TARGET_ARCH: RISCV64
-          TARGET_PKGS: gcc-riscv64-linux-gnu
-        - TARGET_TYPE: loongarch64
-          TARGET_ARCH: LOONGARCH64
-          TARGET_PKGS: gcc-multilib
+        - arch: X64
+          short: x64
+          pkgs: gcc-multilib
+        - arch: IA32
+          short: ia32
+          pkgs: gcc-multilib
+        - arch: AARCH64
+          short: aa64
+          pkgs: gcc-aarch64-linux-gnu
+        - arch: ARM
+          short: arm
+          pkgs: gcc-arm-linux-gnueabi
+        - arch: RISCV64
+          short: riscv64
+          pkgs: gcc-riscv64-linux-gnu
+        - arch: LOONGARCH64
+          short: loongarch64
+          pkgs: gcc-multilib
 
     steps:
     - name: Check out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
@@ -60,16 +63,16 @@ jobs:
     - name: Set up Linux environment
       run: |
         sudo apt-get update
-        sudo apt-get -y --no-install-recommends install python3-setuptools nasm uuid-dev ${{ matrix.TARGET_PKGS }}
-        if [[ "${{ matrix.TARGET_ARCH }}" == "LOONGARCH64" ]]; then
-          curl -L -O https://github.com/loongson/build-tools/releases/download/2024.11.01/x86_64-cross-tools-loongarch64-binutils_2.43.1-gcc_14.2.0-glibc_2.40.tar.xz
-          tar -xJf x86_64-cross-tools-loongarch64-binutils_2.43.1-gcc_14.2.0-glibc_2.40.tar.xz
+        sudo apt-get -y --no-install-recommends install python3-setuptools nasm uuid-dev ${{ matrix.pkgs }}
+        if [[ "${{ matrix.arch }}" == "LOONGARCH64" ]]; then
+          curl -L -O https://github.com/loongson/build-tools/releases/download/${LOONGARCH64_TOOLCHAIN_TAG}/${LOONGARCH64_TOOLCHAIN_NAME}
+          tar -xJf ${LOONGARCH64_TOOLCHAIN_NAME}
           echo "$PWD/cross-tools/bin" >> "$GITHUB_PATH"
         fi
 
     - name: Set up EDK2
       run: |
-        git clone --recursive https://github.com/tianocore/edk2.git -b ${{ env.EDK2_BASE }}
+        git clone --branch ${EDK2_STABLE_TAG} --recursive https://github.com/tianocore/edk2.git
         make -C edk2/BaseTools
 
     - name: Build UEFI bootloader
@@ -77,20 +80,20 @@ jobs:
         export WORKSPACE=$PWD
         export PACKAGES_PATH=$WORKSPACE:$WORKSPACE/edk2
         source edk2/edksetup.sh
-        build -a ${{ matrix.TARGET_ARCH }} -b ${{ env.BUILD_TYPE }} -t ${{ env.COMPILER }} -p Md5SumPkg.dsc
-        mv Build/${{ env.BUILD_TYPE }}_${{ env.COMPILER }}/${{ matrix.TARGET_ARCH }}/Md5Sum.efi boot${{ matrix.TARGET_TYPE }}.efi
+        build -a ${{ matrix.arch }} -b ${{ env.BUILD_TYPE }} -t ${{ env.COMPILER }} -p Md5SumPkg.dsc
+        mv Build/${{ env.BUILD_TYPE }}_${{ env.COMPILER }}/${{ matrix.arch }}/Md5Sum.efi boot${{ matrix.short }}.efi
 
     - name: Display SHA-256
       run: sha256sum *.efi
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: ${{ matrix.TARGET_TYPE }}
+        name: ${{ matrix.short }}
         path: ./*.efi
 
     - name: Create release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       if: startsWith(github.ref, 'refs/tags/')
       with:
         token: ${{ secrets.GITHUB_TOKEN }}

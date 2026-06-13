@@ -23,18 +23,21 @@
     <LocalDebuggerCommandArguments>//d .vs\debug.vbs "$(Configuration)" "$(TargetPath)" "$(PlatformShortName)"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArgumentsHistory>//d .vs\debug.vbs "Debug" "C:\Projects\uefi-md5sum\aa64\Debug\bootaa64.efi" "ARM64"|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LocalDebuggerCommand>$(SystemRoot)\System32\wscript</LocalDebuggerCommand>
     <LocalDebuggerCommandArguments>//d .vs\debug.vbs "$(Configuration)" "$(TargetPath)" "$(PlatformShortName)"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArgumentsHistory>//d .vs\debug.vbs "Release" "C:\Projects\uefi-md5sum\x64\Release\bootx64.efi" "x64"|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LocalDebuggerCommand>$(SystemRoot)\System32\wscript</LocalDebuggerCommand>
     <LocalDebuggerCommandArguments>//d .vs\debug.vbs "$(Configuration)" "$(TargetPath)" "$(PlatformShortName)"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArgumentsHistory>//d .vs\debug.vbs "Release" "C:\Projects\uefi-md5sum\ia32\Release\bootia32.efi" "x86"|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <LocalDebuggerCommand>$(SystemRoot)\System32\wscript</LocalDebuggerCommand>
@@ -47,5 +50,6 @@
     <LocalDebuggerCommandArguments>//d .vs\debug.vbs "$(Configuration)" "$(TargetPath)" "$(PlatformShortName)"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArgumentsHistory>//d .vs\debug.vbs "Release" "C:\Projects\uefi-md5sum\aa64\Release\bootaa64.efi" "ARM64"|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
 </Project>

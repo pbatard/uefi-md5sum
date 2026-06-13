@@ -14,62 +14,63 @@ jobs:
 
     strategy:
       matrix:
+        # NB: Qemu doesn't support -smbios for RISCV64 or LoongArch, so we don't run the tests there
+        type: [x64, ia32, aa64, arm]
         include:
-        # NB: Qemu doesn't support -smbios for RISCV64, so we don't run the tests there
-        - TARGET_TYPE: x64
-          TARGET_PKGS: qemu-system-x86
-          QEMU_ARCH: x86_64
-          QEMU_OPTS: -M q35
-          FW_BASE: OVMF
-        - TARGET_TYPE: ia32
-          TARGET_PKGS: qemu-system-x86
-          QEMU_ARCH: i386
-          QEMU_OPTS: -M pc
-          FW_BASE: OVMF
-        - TARGET_TYPE: aa64
-          TARGET_PKGS: qemu-system-arm
-          QEMU_ARCH: aarch64
-          QEMU_OPTS: -M virt -cpu cortex-a57
-          FW_BASE: AAVMF
-        - TARGET_TYPE: arm
-          TARGET_PKGS: qemu-system-arm
-          QEMU_ARCH: arm
-          QEMU_OPTS: -M virt -cpu cortex-a15
-          FW_BASE: AAVMF
+        - type: x64
+          pkgs: qemu-system-x86
+          qemu_arch: x86_64
+          qemu_opts: -M q35
+          fw_base: OVMF
+        - type: ia32
+          pkgs: qemu-system-x86
+          qemu_arch: i386
+          qemu_opts: -M pc
+          fw_base: OVMF
+        - type: aa64
+          pkgs: qemu-system-arm
+          qemu_arch: aarch64
+          qemu_opts: -M virt -cpu cortex-a57
+          fw_base: AAVMF
+        - type: arm
+          pkgs: qemu-system-arm
+          qemu_arch: arm
+          qemu_opts: -M virt -cpu cortex-a15
+          fw_base: AAVMF
 
     steps:
     - name: Check out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
     - name: Set up Linux environment
       run: |
         sudo apt-get update
-        sudo apt-get -y --no-install-recommends install ${{ matrix.TARGET_PKGS }}
+        sudo apt-get -y --no-install-recommends install ${{ matrix.pkgs }}
 
     - name: Download artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         run-id: ${{ github.event.workflow_run.id }}
-        name: ${{ matrix.TARGET_TYPE }}
+        name: ${{ matrix.type }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Download UEFI firmware
       run: |
-        FW_ARCH=$(echo ${{ matrix.TARGET_TYPE }} | tr a-z A-Z)
-        FW_ZIP=${{ matrix.FW_BASE }}-${FW_ARCH}.zip
-        curl -O https://efi.akeo.ie/${{ matrix.FW_BASE }}/${FW_ZIP}
+        FW_ARCH=$(echo ${{ matrix.type }} | tr a-z A-Z)
+        FW_ZIP=${{ matrix.fw_base }}-${FW_ARCH}.zip
+        curl -O https://efi.akeo.ie/${{ matrix.fw_base }}/${FW_ZIP}
         7z x ${FW_ZIP}
         rm ${FW_ZIP}
 
     - name: Build image directory
       run: |
         mkdir -p image/efi/boot
-        cp boot${{ matrix.TARGET_TYPE }}.efi image/efi/boot
+        cp boot${{ matrix.type }}.efi image/efi/boot
 
     - name: Run tests
       run: |
-         export QEMU_CMD="qemu-system-${{ matrix.QEMU_ARCH }} ${{ matrix.QEMU_OPTS }} -smbios type=0,vendor=\"GitHub Actions Test\",version=\"v1.0\" -L . -drive if=pflash,format=raw,unit=0,file=${{ matrix.FW_BASE }}.fd,readonly=on -drive format=raw,file=fat:rw:image -nodefaults -nographic -serial stdio -net none"
+         export QEMU_CMD="qemu-system-${{ matrix.qemu_arch }} ${{ matrix.qemu_opts }} -smbios type=0,vendor=\"GitHub Actions Test\",version=\"v1.0\" -L . -drive if=pflash,format=raw,unit=0,file=${{ matrix.fw_base }}.fd,readonly=on -drive format=raw,file=fat:rw:image -nodefaults -nographic -serial stdio -net none"
          ./tests/gen_tests.sh ./tests/test_list.txt
          ./tests/run_tests.sh
